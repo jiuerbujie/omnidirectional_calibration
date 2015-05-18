@@ -9,7 +9,7 @@ protected:
 	const static cv::Matx33d R;
 	const static cv::Vec3d T;
 	const static double xi;
-}
+};
 
 const cv::Size omnidirTest::imageSize(1280, 800);
 
