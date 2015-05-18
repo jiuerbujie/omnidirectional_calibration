@@ -7,7 +7,7 @@ namespace cv
 namespace omnidir
 {
     void projectPoints(InputArray objectPoints, OutputArray imagePoints, InputArray rvec, InputArray tvec, 
-            InputArray K, InputArray D, double xi, OutputArray jacobian = noArray());
+                       InputArray K, InputArray D, double xi, OutputArray jacobian = noArray());
 } // omnidir
 
 } //cv
