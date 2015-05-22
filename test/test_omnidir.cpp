@@ -91,18 +91,73 @@ TEST_F(omnidirTest, jacobian)
                        0,                 0,           1);
     
     cv::Mat jacobians;
-    cv::omnidir::projectPoints(X, x1, om, T, K, D, xi, s, jacobians);
+    cv::omnidir::projectPoints(X, x1, om, T, K, D, s, xi, jacobians);
 
     // Test on T:
     cv::Mat dT(3, 1, CV_64FC1);
     r.fill(dT, cv::RNG::NORMAL, 0, 1);
     dT *= 1e-9*cv::norm(T);
     cv::Mat T2 = T + dT;
-    cv::omnidir::projectPoints(X, x2, om, T2, K, D, xi, s, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T2, K, D, s, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(3,6) * dT).reshape(2,1);
-	std::cout << cv::norm(x2 - xpred) <<std::endl;
 	CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
+    // Test on om
+    cv::Mat dom(3, 1, CV_64FC1);
+    r.fill(dom, cv::RNG::NORMAL, 0, 1);
+    dom *= 1e-9*cv::norm(om);
+    cv::Mat om2 = om + dom;
+    cv::omnidir::projectPoints(X, x2, om2, T, K, D, s, xi, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(0,3) * dom).reshape(2,1);
+    std::cout << cv::norm(x2 - xpred) <<std::endl;
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+
+    // Test on f
+    cv::Mat df(2, 1, CV_64FC1);
+    r.fill(df, cv::RNG::NORMAL, 0, 1);
+    df *= 1e-9 * cv::norm(f);
+    cv::Matx33d K2 = K + cv::Matx33d(df.at<double>(0), 0, 0, 0, df.at<double>(1), 0, 0, 0, 1);
+    cv::omnidir::projectPoints(X, x2, om, T, K2, D, s, xi, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(6,8)* df).reshape(2, 1);
+    std::cout << cv::norm(x2 - xpred) <<std::endl;
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+
+    // Test on s
+    double ds = r.gaussian(1);
+    ds *= 1e-9 * abs(s);
+    double s2 = s + ds;
+    cv::omnidir::projectPoints(X, x2, om, T, K, D, s2, xi, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(8,9)*ds).reshape(2, 1);
+    std::cout << cv::norm(x2 - xpred) <<std::endl;
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+
+    // Test on c
+    cv::Mat dc(2, 1, CV_64FC1);
+    r.fill(dc, cv::RNG::NORMAL, 0, 1);
+    dc *= 1e-9 * cv::norm(c);
+    K2 = K + cv::Matx33d(0, 0, dc.at<double>(0), 0, 0, dc.at<double>(1), 0, 0, 1);
+    cv::omnidir::projectPoints(X, x2, om, T, K2, D, s, xi, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(9,11)*dc).reshape(2, 1);
+    std::cout << cv::norm(x2 - xpred) <<std::endl;
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+
+    // Test on xi
+    double dxi = r.gaussian(1);
+    dxi *= 1e-9 * abs(xi);
+    double xi2 = xi + dxi;
+    cv::omnidir::projectPoints(X, x2, om, T, K, D, s, xi2, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(11,12)*dxi).reshape(2, 1);
+    std::cout << cv::norm(x2 - xpred) <<std::endl;
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+
+    // Test on kp
+    cv::Mat dD(4, 1, CV_64FC1);
+    r.fill(dD, cv::RNG::NORMAL, 0, 1);
+    dD *= 1e-9 * cv::norm(D);
+    cv::Mat D2 = D + dD;
+    cv::omnidir::projectPoints(X, x2, om, T, K, D2, s, xi, cv::noArray());
+    xpred = x1 + cv::Mat(jacobians.colRange(12,16)*dD).reshape(2, 1);
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 }
 
 
@@ -124,6 +179,3 @@ int main(int argc, char* argv[])
 	return RUN_ALL_TESTS();
 	cv::waitKey();
 }
-
-
-

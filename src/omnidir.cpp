@@ -57,7 +57,7 @@ namespace cv { namespace
 /////////////////////////////////////////////////////////////////////////////
 //////// projectPoints
 void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints, 
-                InputArray _rvec, InputArray _tvec, InputArray _K, InputArray _D, double xi, double s, OutputArray jacobian)
+                InputArray _rvec, InputArray _tvec, InputArray _K, InputArray _D, double s, double xi, OutputArray jacobian)
 {
     CV_Assert(objectPoints.type() == CV_32FC3 || objectPoints.type() == CV_64FC3);
     // each row is an image point
@@ -189,9 +189,49 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
 }
 
 /////////////////////////////////////////////////////////////////////////////
+//////// distortPoints
+void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi, double s)
+{
+    CV_Assert(undistorted.type() == CV_64FC2);
+    distorted.create(undistorted.size(), undistorted.type());
+    size_t n = undistorted.total();
+
+    CV_Assert(K.size() == Size(3, 3) && K.type() == CV_64F && D.total() == 4);
+
+    Vec4d kp = (Vec4d)*D.getMat().ptr<Vec4d>();
+    Vec2d k = Vec2d(kp[0], kp[1]);
+    Vec2d p = Vec2d(kp[2], kp[3]);
+
+    Vec2d f, c;
+    Matx33d camMat = K.getMat();
+    f = Vec2d(camMat(0,0), camMat(1,1));
+    c = Vec2d(camMat(0,2), camMat(1,2));
+
+    const Vec2d *srcd = undistorted.getMat().ptr<Vec2d>();
+    Vec2d *desd = distorted.getMat().ptr<Vec2d>();
+
+    for (size_t i = 0; i < n; i++)
+    {
+        Vec2d pi = srcd[0];    // image points
+        Vec2d xu((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]+c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]); // unified image plane
+        double r2 = xu[0]*xu[0] + xu[1]*xu[1];
+        double r4 = r2*r2;
+        // add distortion
+        Vec2d xd;
+        xd[0] = (1+k[0]*r2+k[1]*r4)*xu[0] + 2*p[0]*xu[0]*xu[1] + p[1]*(r2+2*xu[0]*xu[0]);
+        xd[1] = (1+k[0]*r2+k[1]*r4)*xu[1] + p[0]*(r2+2*xu[1]*xu[1]) + 2*p[1]*xu[0]*xu[1];
+        // project to image
+        Vec3d pr = camMat * Vec3d(xd[0], xd[1], 1);
+        desd[i] = Vec2d(pr[0],pr[1]);
+    }
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
 //////// undistortPoints
 void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted, 
-                         InputArray K, InputArray D, InputArray R, InputArray P)
+                         InputArray K, InputArray D, double xi,InputArray R, InputArray P, double s)
 {
     CV_Assert(distorted.type() == CV_64FC2);
     undistorted.create(distorted.size(), distorted.type());
@@ -204,7 +244,9 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     Matx33d camMat = K.getMat();
     f = cv::Vec2d(camMat(0,0), camMat(1,1));
 
-    Vec4d k = (Vec4d)*D.getMat().ptr<Vec4d>();
+    Vec4d kp = (Vec4d)*D.getMat().ptr<Vec4d>();
+	Vec2d k = Vec2d(kp[0], kp[1]);
+	Vec2d p = Vec2d(kp[2], kp[3]);
 
     cv::Matx33d RR = cv::Matx33d::eye();
 	// R is om
@@ -219,16 +261,16 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     {
         R.getMat().convertTo(RR, CV_64F);
     }
-
+	cv::Matx33d PP;
     if(!P.empty())
     {
-		cv::Matx33d PP;
         P.getMat().colRange(0, 3).convertTo(PP, CV_64F);
-        RR = PP * RR;
+        //RR = PP * RR;
     }
     else
     {
-        RR = camMat * RR; 
+        //RR = camMat * RR; 
+		PP = camMat;    //use old camera matrix
     }
     const cv::Vec2d *srcd = distorted.getMat().ptr<cv::Vec2d>();
 	cv::Vec2d *dstd = undistorted.getMat().ptr<cv::Vec2d>();
@@ -238,23 +280,147 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     for (size_t i = 0; i < n; i++)
     {
         Vec2d pi = (Vec2d)srcd[i];	// image point
-        Vec2d pw((pi[0]-c[0]/f[0], (pi[1]-c[1])/f[1]));	// world point
-        Vec2d pu = pw;	// points withour distortion
+        //Vec2d pw((pi[0]-c[0]/f[0], (pi[1]-c[1])/f[1]));	// unified image plane
+        Vec2d pp((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]+c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]);
+        Vec2d pu = pp;	// points without distortion
         Vec2d pu_temp;
         // remove distortion iteratively
         for (int j = 0; j < 10; j++)
         {
             double r2 = pu[0]*pu[0] + pu[1]*pu[1];
             double r4 = r2*r2;
-            pu_temp[0] = (pu[0] - 2*k[2]*pu[0]*pu[1] - k[3]*(r2+2*pu[0]*pu[0])) / (1 + k[0]*r2 + k[1]*r4);
-            pu_temp[1] = (pu[1] - 2*k[3]*pu[0]*pu[1] - k[2]*(r2+2*pu[1]*pu[1])) / (1 + k[0]*r2 + k[1]*r4);
+            pu_temp[0] = (pu[0] - 2*p[1]*pu[0]*pu[1] - p[2]*(r2+2*pu[0]*pu[0])) / (1 + k[0]*r2 + k[1]*r4);
+            pu_temp[1] = (pu[1] - 2*p[2]*pu[0]*pu[1] - p[1]*(r2+2*pu[1]*pu[1])) / (1 + k[0]*r2 + k[1]*r4);
             pu = pu_temp;
         }
+        // project to unit sphere
+        double r2 = pu[0]*pu[0] + pu[1]*pu[1];
+        double a = (r2 + 1);
+        double b = 2*xi*r2;
+        double c = r2*xi*xi-1;
+        double Zs = (-b + sqrt(b*b - 4*a*c))/(2*a);
+        Vec3d Xw = Vec3d(pu[0]*(Zs + xi), pu[1]*(Zs +xi), Zs);
+        // rotate
+        Xw = RR * Xw;
+        // project back to sphere
+        Vec3d Xs = Xw / cv::norm(Xw);
         // reproject to image
-        Vec3d pr = RR * Vec3d(pu[0], pu[1], 1.0);	// apply rotation and may 
+        Vec3d pr = PP * Vec3d(Xs[0]/(Xs[2]+xi), Xs[1]/(Xs[2]+xi), 1.0);	// apply rotation and may 
         //Vec2d fi(pr[0]/pr[2], pr[1]/pr[2]);
-		dstd[i] = Vec2d(pr[0]/pr[2], pr[1]/pr[2]);
-	}
+        //dstd[i] = Vec2d(pr[0]/pr[2], pr[1]/pr[2]);
+        dstd[i] = Vec2d(pr[0], pr[1]);
+    }
+}
 
 
+/////////////////////////////////////////////////////////////////////////////
+//////// cv::omnidir::initUndistortRectifyMap
+void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi, double s, InputArray R, InputArray P, 
+    const cv::Size& size, int m1type, OutputArray map1, OutputArray map2)
+{
+    CV_Assert( m1type == CV_16SC2 || m1type == CV_32F || m1type <=0 );
+    map1.create( size, m1type <= 0 ? CV_16SC2 : m1type );
+    map2.create( size, map1.type() == CV_16SC2 ? CV_16UC1 : CV_32F );
+    
+    CV_Assert((K.depth() == CV_32F || K.depth() == CV_64F) && (D.depth() == CV_32F || D.depth() == CV_64F));
+    CV_Assert((P.depth() == CV_32F || P.depth() == CV_64F) && (R.depth() == CV_32F || R.depth() == CV_64F));
+    CV_Assert(K.size() == Size(3, 3) && (D.empty() || D.total() == 4));
+    CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
+    CV_Assert(P.empty() || P.size() == Size(3, 3) || P.size() == Size(4, 3));  
+    
+    cv::Vec2d f, c;
+    if (K.depth() == CV_32F)
+    {
+        Matx33f camMat = K.getMat();
+        f = Vec2f(camMat(0, 0), camMat(1, 1));
+        c = Vec2f(camMat(0, 2), camMat(1, 2));
+    }
+    else
+    {
+        Matx33d camMat = K.getMat();
+        f = Vec2d(camMat(0, 0), camMat(1, 1));
+        c = Vec2d(camMat(0, 2), camMat(1, 2));
+    }
+
+    Vec4d kp = Vec4d::all(0);
+    if (!D.empty())
+        kp = D.depth() == CV_32F ? (Vec4d)*D.getMat().ptr<Vec4f>(): *D.getMat().ptr<Vec4d>();
+	Vec2d k = Vec2d(kp[0], kp[1]);
+	Vec2d p = Vec2d(kp[2], kp[3]);
+    cv::Matx33d RR  = cv::Matx33d::eye();
+    if (!R.empty() && R.total() * R.channels() == 3)
+    {
+        cv::Vec3d rvec;
+        R.getMat().convertTo(rvec, CV_64F);
+        cv::Rodrigues(rvec, RR);
+    }
+    else if (!R.empty() && R.size() == Size(3, 3))
+        R.getMat().convertTo(RR, CV_64F);
+
+    cv::Matx33d PP = cv::Matx33d::eye();
+    if (!P.empty())
+        P.getMat().colRange(0, 3).convertTo(PP, CV_64F);
+	else
+		PP = K.getMat();
+    
+    cv::Matx33d iR = (PP*RR).inv(cv::DECOMP_SVD);
+    //cv::Matx33d iK = PP.inv(cv::DECOMP_SVD);
+    // so far it is undistorted to perspective image
+    for (int i = 0; i < size.height; ++i)
+    {
+        float* m1f = map1.getMat().ptr<float>(i);
+        float* m2f = map2.getMat().ptr<float>(i);
+        short*  m1 = (short*)m1f;
+        ushort* m2 = (ushort*)m2f;
+
+        double _x = i*iR(0, 1) + iR(0, 2),
+               _y = i*iR(1, 1) + iR(1, 2),
+               _w = i*iR(2, 1) + iR(2, 2);
+        for(int j = 0; j < size.width; ++j, _x+=iR(0,0), _y+=iR(1,0), _w+=iR(2,0))
+        {
+            // project back to unit sphere
+            double r = sqrt(_x*_x + _y*_y + _w*_w);
+			double Xs = _x / r;
+            double Ys = _y / r;
+            double Zs = _w / r;
+            // project to image plane
+            double xu = Xs / (Zs + xi),
+                   yu = Ys / (Zs + xi);
+            // add distortion
+            double r2 = xu*xu + yu*yu;
+            double r4 = r2*r2;
+            double xd = (1+k[0]*r2+k[1]*r4)*xu + 2*p[0]*xu*yu + p[1]*(r2+2*xu*xu);
+            double yd = (1+k[0]*r2+k[1]*r4)*yu + p[0]*(r2+2*yu*yu) + 2*p[1]*xu*yu;
+            // to image pixel
+            double u = f[0]*xd + s*yd + c[0];
+            double v = f[1]*yd + c[1];
+            
+            if( m1type == CV_16SC2 )
+            {
+                int iu = cv::saturate_cast<int>(u*cv::INTER_TAB_SIZE);
+                int iv = cv::saturate_cast<int>(v*cv::INTER_TAB_SIZE);
+                m1[j*2+0] = (short)(iu >> cv::INTER_BITS);
+                m1[j*2+1] = (short)(iv >> cv::INTER_BITS);
+                m2[j] = (ushort)((iv & (cv::INTER_TAB_SIZE-1))*cv::INTER_TAB_SIZE + (iu & (cv::INTER_TAB_SIZE-1)));
+            }
+            else if( m1type == CV_32FC1 )
+            {
+                m1f[j] = (float)u;
+                m2f[j] = (float)v;
+            }
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// cv::fisheye::undistortImage
+
+void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
+	InputArray K, InputArray D, double xi, double s, InputArray Knew, const Size& new_size)
+{
+	Size size = new_size.area() != 0 ? new_size : distorted.size();
+
+	cv::Mat map1, map2;
+	omnidir::initUndistortRectifyMap(K, D, xi, s, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
+	cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
 }
