@@ -66,7 +66,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
     Vec3d om = _rvec.depth() == CV_32F ? (Vec3d)*_rvec.getMat().ptr<Vec3f>() : *_rvec.getMat().ptr<Vec3d>();   
     Vec3d T  = _tvec.depth() == CV_32F ? (Vec3d)*_tvec.getMat().ptr<Vec3f>() : *_tvec.getMat().ptr<Vec3d>(); 
     Matx33d K = _K.getMat();
-    Vec<double, 4> kp= (Vec<double,4>)*_D.getMat().ptr<Vec<double,4>>();
+    Vec<double, 4> kp= (Vec<double,4>)*_D.getMat().ptr<Vec<double,4> >();
 
     Vec2d f,c;
     f = Vec2d(K(0,0),K(1,1));
