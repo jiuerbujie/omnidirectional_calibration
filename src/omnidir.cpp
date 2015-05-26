@@ -71,7 +71,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
     Vec2d f,c;
     f = Vec2d(K(0,0),K(1,1));
     c = Vec2d(K(0,2),K(1,2));
-	double s = K(0,1);
+    double s = K(0,1);
     const Vec3d* Xw_all = objectPoints.getMat().ptr<Vec3d>();
     Vec2d* xpd = imagePoints.getMat().ptr<Vec2d>();
 
@@ -87,7 +87,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
     {
         int nvars = 2+2+1+4+3+3+1; // f,c,s,kp,om,T,xi
         jacobian.create(2*int(n), nvars, CV_64F);
-		Jn = jacobian.getMat().ptr<JacobianRow>(0);
+        Jn = jacobian.getMat().ptr<JacobianRow>(0);
     }
 
     double k1=kp[0],k2=kp[1];
@@ -98,7 +98,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
         // convert to camera coordinate
         Vec3d Xw = (Vec3d)Xw_all[i];
         // use opencv248
-		Vec3d Xc = (Vec3d)(R*Xw + T);
+        Vec3d Xc = (Vec3d)(R*Xw + T);
         // use opencv300beta
         //Vec3d Xc = aff*Xw;
 
@@ -151,7 +151,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
             // derivative of xpd respect to T
 
             Matx23d dxpddT = dxpddXc * dXcdT;
-			Matx21d dxudxi(-Xs[0]/(Xs[2]+xi)/(Xs[2]+xi),
+            Matx21d dxudxi(-Xs[0]/(Xs[2]+xi)/(Xs[2]+xi),
                            -Xs[1]/(Xs[2]+xi)/(Xs[2]+xi));
 
             // derivative of xpd respect to xi
@@ -159,18 +159,18 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
             Matx<double,2,4> dxddkp(xu[0]*r2, xu[0]*r4, 2*xu[0]*xu[1], r2+2*xu[0]*xu[0],
                                     xu[1]*r2, xu[1]*r4, r2+2*xu[1]*xu[1], 2*xu[0]*xu[1]);
             
-			// derivative of xpd respect to kp
+            // derivative of xpd respect to kp
             Matx<double,2,4> dxpddkp = dxpddxd * dxddkp;
             
-			// derivative of xpd respect to f
+            // derivative of xpd respect to f
             Matx22d dxpddf(xd[0], 0,
                            0, xd[1]);
             
-			// derivative of xpd respect to c
+            // derivative of xpd respect to c
             Matx22d dxpddc(1, 0,
                            0, 1);
             
-			Jn[0].dom = dxpddom.row(0);
+            Jn[0].dom = dxpddom.row(0);
             Jn[1].dom = dxpddom.row(1);
             Jn[0].dT = dxpddT.row(0);
             Jn[1].dT = dxpddT.row(1);
@@ -207,7 +207,7 @@ void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, I
     Matx33d camMat = K.getMat();
     f = Vec2d(camMat(0,0), camMat(1,1));
     c = Vec2d(camMat(0,2), camMat(1,2));
-	double s = camMat(0,1);
+    double s = camMat(0,1);
     const Vec2d *srcd = undistorted.getMat().ptr<Vec2d>();
     Vec2d *desd = distorted.getMat().ptr<Vec2d>();
 
@@ -244,26 +244,26 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     cv::Vec2d f, c;
     Matx33d camMat = K.getMat();
     f = cv::Vec2d(camMat(0,0), camMat(1,1));
-	c = cv::Vec2d(camMat(0,2), camMat(1,2));
-	double s = camMat(0,1);
+    c = cv::Vec2d(camMat(0,2), camMat(1,2));
+    double s = camMat(0,1);
     Vec4d kp = (Vec4d)*D.getMat().ptr<Vec4d>();
-	Vec2d k = Vec2d(kp[0], kp[1]);
-	Vec2d p = Vec2d(kp[2], kp[3]);
+    Vec2d k = Vec2d(kp[0], kp[1]);
+    Vec2d p = Vec2d(kp[2], kp[3]);
 
     cv::Matx33d RR = cv::Matx33d::eye();
-	// R is om
+    // R is om
     if(!R.empty() && R.total()*R.channels() == 3)
     {
         cv::Vec3d rvec;
-		R.getMat().convertTo(rvec, CV_64F);
-		//RR = cv::Affine3d(rvec).rotation();
-		cv::Rodrigues(rvec, RR);
+        R.getMat().convertTo(rvec, CV_64F);
+        //RR = cv::Affine3d(rvec).rotation();
+        cv::Rodrigues(rvec, RR);
     }
     else if (!R.empty() && R.size() == Size(3,3))
     {
         R.getMat().convertTo(RR, CV_64F);
     }
-	cv::Matx33d PP;
+    cv::Matx33d PP;
     if(!P.empty())
     {
         P.getMat().colRange(0, 3).convertTo(PP, CV_64F);
@@ -272,10 +272,10 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     else
     {
         //RR = camMat * RR; 
-		PP = camMat;    //use old camera matrix
+        PP = camMat;    //use old camera matrix
     }
     const cv::Vec2d *srcd = distorted.getMat().ptr<cv::Vec2d>();
-	cv::Vec2d *dstd = undistorted.getMat().ptr<cv::Vec2d>();
+    cv::Vec2d *dstd = undistorted.getMat().ptr<cv::Vec2d>();
 
     size_t n = distorted.total();
     for (size_t i = 0; i < n; i++)
@@ -304,7 +304,7 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
         // project back to sphere
         Vec3d Xs = Xw / cv::norm(Xw);
         // reproject to image
-		Vec3d ppu = Vec3d(Xs[0]/(Xs[2]+xi), Xs[1]/(Xs[2]+xi), 1.0);
+        Vec3d ppu = Vec3d(Xs[0]/(Xs[2]+xi), Xs[1]/(Xs[2]+xi), 1.0);
         Vec3d pr = PP * ppu;	// apply rotation and may new camera matrix
         //Vec2d fi(pr[0]/pr[2], pr[1]/pr[2]);
         //dstd[i] = Vec2d(pr[0]/pr[2], pr[1]/pr[2]);
@@ -329,27 +329,27 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
     CV_Assert(P.empty() || P.size() == Size(3, 3) || P.size() == Size(4, 3));  
     
     cv::Vec2d f, c;
-	double s;
+    double s;
     if (K.depth() == CV_32F)
     {
         Matx33f camMat = K.getMat();
         f = Vec2f(camMat(0, 0), camMat(1, 1));
         c = Vec2f(camMat(0, 2), camMat(1, 2));
-		s = camMat(0,1);
+        s = camMat(0,1);
     }
     else
     {
         Matx33d camMat = K.getMat();
         f = Vec2d(camMat(0, 0), camMat(1, 1));
         c = Vec2d(camMat(0, 2), camMat(1, 2));
-		s = camMat(0,1);
+        s = camMat(0,1);
     }
 
     Vec4d kp = Vec4d::all(0);
     if (!D.empty())
         kp = D.depth() == CV_32F ? (Vec4d)*D.getMat().ptr<Vec4f>(): *D.getMat().ptr<Vec4d>();
-	Vec2d k = Vec2d(kp[0], kp[1]);
-	Vec2d p = Vec2d(kp[2], kp[3]);
+    Vec2d k = Vec2d(kp[0], kp[1]);
+    Vec2d p = Vec2d(kp[2], kp[3]);
     cv::Matx33d RR  = cv::Matx33d::eye();
     if (!R.empty() && R.total() * R.channels() == 3)
     {
@@ -363,8 +363,8 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
     cv::Matx33d PP = cv::Matx33d::eye();
     if (!P.empty())
         P.getMat().colRange(0, 3).convertTo(PP, CV_64F);
-	else
-		PP = K.getMat();
+    else
+        PP = K.getMat();
     
     cv::Matx33d iR = (PP*RR).inv(cv::DECOMP_SVD);
     //cv::Matx33d iK = PP.inv(cv::DECOMP_SVD);
@@ -383,7 +383,7 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
         {
             // project back to unit sphere
             double r = sqrt(_x*_x + _y*_y + _w*_w);
-			double Xs = _x / r;
+            double Xs = _x / r;
             double Ys = _y / r;
             double Zs = _w / r;
             // project to image plane
@@ -416,14 +416,170 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// cv::fisheye::undistortImage
+/// cv::omnidir::undistortImage
 
 void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
-	InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size)
+    InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size)
 {
-	Size size = new_size.area() != 0 ? new_size : distorted.size();
+    Size size = new_size.area() != 0 ? new_size : distorted.size();
 
-	cv::Mat map1, map2;
-	omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
-	cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
+    cv::Mat map1, map2;
+    omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
+    cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// cv::omnidir::initialParams
+
+void cv::omnidir::initialParams(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray _K)
+{
+    
+
+    double u0 = size.width / 2;
+    double v0 = size.height / 2;
+
+    int n_img = (int)imagePoints.total();
+
+    std::vector<cv::Vec3d> v_omAll(n_img), v_tAll(n_img);
+    
+    std::vector<double> gammaAll;
+
+    _K.create(3, 3, CV_64F);
+    Mat K = K_.getMat();
+    for (int image_idx = 0; image_idx < n_img; ++image_idx)
+    {
+        cv::Mat objPoints = patternPoints.getMat(image_idx);
+        cv::Mat imgPoints = imagePoints.getMat(image_idx);
+        // objectPoints should be 3-channel data, imagePoints should be 2-channel data
+        CV_Assert(objPoints.type() == CV_64FC3 && imgPoints.type() == CV_64FC2);
+        /*if (objPoints.cols > objPoints.rows)
+            objPoints = objPoints.t();
+        if (imgPoints.cols > imgPoints.rows)
+            imgPoints = imgPoints.t();*/
+        vector<cv::Mat> xy, uv;
+        cv::split(objPoints, xy);
+        cv::split(imgPoints, uv);
+        //cv::Mat x = objPoints.col(0), y = objPoints.col(1);
+        //cv::Mat u = imgPoints.col(0) - u0, v = imgPoints.col(1) - v0;
+        int n_point = imgPoints.rows * imgPoints.cols;
+        cv::Mat x = xy[0].reshape(1, n_point), y = xy[1].reshape(1, n_point),
+                u = uv[0].reshape(1, n_point), v = uv[1].reshape(1, n_point);
+
+        cv::Mat sqrRho = u.mul(u) + v.mul(v);
+        
+        // compute extrinsic parameters
+        // Form equation for te essential matrix, see Scaramuzza's paper:
+        // A Toolbox for Easily Calibrating Omnidirectional Cameras 
+        cv::Mat M(n_point, 6, CV_64F);
+        Mat(-v.mul(x)).copyTo(M.col(0));
+        Mat(-v.mul(y)).copyTo(M.col(1));
+        Mat(u.mul(x)).copyTo(M.col(2));
+        Mat(u.mul(y)).copyTo(M.col(3));
+        Mat(-v).copyTo(M.col(4));
+        Mat(u).copyTo(M.col(5));
+        Mat V;
+        cv::SVD::compute(M, cv::noArray(), cv::noArray(), V);
+        V = V.t();
+
+        double miniReprojectError = 1e5;
+        // the signs of r1, r2, r3 are unkown, so they can be flipped.
+        for (int coef = -1; coef == 1; coef+=2)
+        {
+            double r11 = V.at<double>(0, 5) * coef;
+            double r12 = V.at<double>(1, 5) * coef;
+            double r21 = V.at<double>(2, 5) * coef;
+            double r22 = V.at<double>(3, 5) * coef;
+            double t1 = V.at<double>(4, 5) * coef;
+            double t2 = V.at<double>(5, 5) * coef;
+
+            Mat roots;
+            double r31s;
+            solvePoly(Matx13d((r11*r12+r21*r22)*(r11*r12+r21*r22), r11*r11+r21*r21-r12*r12-r22*r22, 1), roots, 50);
+            if (roots.at<Vec2d>(0)[1] == 0)
+                r31s = roots.at<Vec2d>(0)[0];
+            else
+                r31s = roots.at<Vec2d>(1)[0];
+            
+            for (int coef2 = -1; coef == 1; coef+=2)
+            {
+                double r31 = r31s * coef2;
+                double r32 = -(r11*r12 + r21*r22) / r31;
+
+                cv::Vec3d r1(r11, r21, r31);
+                cv::Vec3d r2(r12, r22, r32);
+                cv::Vec3d t(t1, t2, 0);
+                double scale = 1 / cv::norm(r1);
+                r1 = r1 * scale;
+                r2 = r2 * scale;
+                t = t * scale;
+
+                // compute intrisic parameters
+                // Form equations in Scaramuzza's paper
+                // A Toolbox for Easily Calibrating Omnidirectional Cameras 
+                Mat A(n_point*2, 3, CV_64F);
+                Mat(r1[1]*x + r2[1]*y + t[1]).copyTo(A.rowRange(0, n_point).col(0));
+                Mat(r1[0]*x + r2[0]*y + t[0]).copyTo(A.rowRange(n_point, 2*n_point).col(0));
+                Mat(-A.col(0)*sqrRho).copyTo(A.col(1));
+                Mat(-v).copyTo(A.rowRange(0, n_point).col(2));
+                Mat(-u).copyTo(A.rowRange(n_point, 2*n_point).col(2));
+
+                // Operation to avoid bad numerical-condition of A
+                Vec3d maxA, minA;
+                for (int j = 0; j < A.cols; j++)
+                {
+                    cv::minMaxLoc(cv::abs(A.col(j)), &minA[j], &maxA[j]);
+                    A.col(j) = A.col(j) / maxA[j];
+                }
+
+                Mat B(n_point*2 , 1, CV_64F);
+                Mat(v.mul(r1[2]*x + r2[2]*y)).copyTo(B.rowRange(0, n_point));
+                Mat(u.mul(r1[2]*x + r2[2]*y)).copyTo(B.rowRange(n_point, 2*n_point));
+
+                Mat res = A.inv(DECOMP_SVD) * B;
+                res = res.mul(1/Mat(maxA));
+
+                double gamma = sqrt(res.at<double>(0) / res.at<double>(1));
+                t[2] = res.at<double>(2);
+
+                cv::Vec3d r3 = r1.cross(r2);
+
+                Matx33d R(r1[0], r2[0], r3[0],
+                          r1[1], r2[1], r3[1],
+                          r1[2], r2[2], r3[2]);
+                Vec3d om;
+                Rodrigues(R, om);
+                // pattern points after applied rotation and translation, if it is behind of camera, then
+                // the signs of parameters are invalid. 
+                Mat patternPointsExt = Mat(R) * objPoints.reshape(1, 3) + cv::repeat(Mat(t), 1, n_point);
+                for (int i = 0; i < n_point; ++i)
+                {
+                    if (patternPointsExt.at<double>(2,i) >0)
+                        continue;
+                }
+
+                // project pattern points to images
+                Mat projedImgPoints;
+                Matx33d K(gamma, 0, u0, 0, gamma, v0, 0, 0, 1);
+                Matx14d D(0, 0, 0, 0);
+                cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, K, D, 1, cv::noArray());
+                double reprojectError = cv::norm(projedImgPoints - imgPoints, cv::NORM_L2);
+                // this reproject error is smaller
+                if (reprojectError < miniReprojectError)
+                {
+                    miniReprojectError = reprojectError;
+                    v_omAll[image_idx] = om;
+                    v_tAll[image_idx] = t;
+                    gammaAll[image_idx] = gamma;
+                }
+            }
+        }
+
+        double gammaFinal = 0;
+        for (int i = 0; i < (int)gammaAll.size(); i++)
+            gammaFinal += gammaAll[i];
+        gammaFinal = gammaFinal / gammaAll.size();
+        K = Mat(Matx33d(gammaFinal, 0, u0, 0, gammaFinal, v0, 0, 0, 1));
+        cv::Mat(v_omAll).convertTo(omAll, CV_64FC3);
+        cv::Mat(v_tAll).convertTo(tAll, CV_64FC3);
+    }
 }

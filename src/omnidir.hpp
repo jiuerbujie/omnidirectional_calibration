@@ -56,7 +56,9 @@ namespace omnidir
 
     void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, const cv::Size& size, int mltype, OutputArray map1, OutputArray map2);
     
-	void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size);
+    void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size);
+
+    void initialParams(InputArray objectPoints, InputArray imagePoints, Size size, OutputArray RAll, OutputArray tAll, OutputArray K);
 } // omnidir
 
 } //cv
