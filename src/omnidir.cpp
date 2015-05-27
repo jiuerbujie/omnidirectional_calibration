@@ -429,9 +429,9 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// cv::omnidir::initialParams
+/// cv::omnidir::internal::initializeCalibration
 
-void cv::omnidir::initialParams(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray _K)
+void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray _K)
 {
     
     double u0 = size.width / 2;

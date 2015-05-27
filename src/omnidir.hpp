@@ -47,6 +47,7 @@ namespace cv
 {
 namespace omnidir
 {
+
     void projectPoints(InputArray objectPoints, OutputArray imagePoints, InputArray rvec, InputArray tvec, 
                        InputArray K, InputArray D, double xi,OutputArray jacobian = noArray());
 
@@ -58,7 +59,12 @@ namespace omnidir
     
     void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size);
 
-    void initialParams(InputArray objectPoints, InputArray imagePoints, Size size, OutputArray RAll, OutputArray tAll, OutputArray K);
+namespace internal
+{
+    void initializeCalibration(InputArray objectPoints, InputArray imagePoints, Size size, OutputArray RAll, OutputArray tAll, OutputArray K);
+} // internal
+
+    
 } // omnidir
 
 } //cv
