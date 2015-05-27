@@ -434,7 +434,6 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 void cv::omnidir::initialParams(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray _K)
 {
     
-
     double u0 = size.width / 2;
     double v0 = size.height / 2;
 
@@ -445,7 +444,7 @@ void cv::omnidir::initialParams(InputArrayOfArrays patternPoints, InputArrayOfAr
     std::vector<double> gammaAll;
 
     _K.create(3, 3, CV_64F);
-    Mat K = K_.getMat();
+    Mat K = _K.getMat();
     for (int image_idx = 0; image_idx < n_img; ++image_idx)
     {
         cv::Mat objPoints = patternPoints.getMat(image_idx);
