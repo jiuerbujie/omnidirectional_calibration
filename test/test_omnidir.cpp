@@ -46,47 +46,47 @@
 class omnidirTest:public ::testing::Test{
 protected:
     const static cv::Size imageSize;
-	const static cv::Matx33d K;
-	const static cv::Vec4d D;
-	const static cv::Vec3d om;
-	const static cv::Vec3d T;
-	const static double xi;
-	const static double s;
+    const static cv::Matx33d K;
+    const static cv::Vec4d D;
+    const static cv::Vec3d om;
+    const static cv::Vec3d T;
+    const static double xi;
+    const static double s;
 };
 TEST_F(omnidirTest, projectPoints)
 {
-	double cols = this->imageSize.width,
-		rows = this->imageSize.height;
-	double xi = this->xi;
-	double s = this->s;
-	const int N = 20;
-	cv::Mat distorted0(1, N*N, CV_64FC2), undist1, undist2, distorted1, distorted2;
-	undist2.create(distorted0.size(), CV_MAKETYPE(distorted0.depth(), 3));
-	cv::Vec2d* pts = distorted0.ptr<cv::Vec2d>();
+    double cols = this->imageSize.width,
+        rows = this->imageSize.height;
+    double xi = this->xi;
+    double s = this->s;
+    const int N = 20;
+    cv::Mat distorted0(1, N*N, CV_64FC2), undist1, undist2, distorted1, distorted2;
+    undist2.create(distorted0.size(), CV_MAKETYPE(distorted0.depth(), 3));
+    cv::Vec2d* pts = distorted0.ptr<cv::Vec2d>();
 
-	cv::Vec2d c(this->K(0, 2), this->K(1, 2));
-	for(int y = 0, k = 0; y < N; ++y)
-		for(int x = 0; x < N; ++x)
-		{
-			cv::Vec2d point(x*cols/(N-1.f), y*rows/(N-1.f));
-			pts[k++] = (point - c) * 0.85 + c;
-		}
+    cv::Vec2d c(this->K(0, 2), this->K(1, 2));
+    for(int y = 0, k = 0; y < N; ++y)
+        for(int x = 0; x < N; ++x)
+        {
+            cv::Vec2d point(x*cols/(N-1.f), y*rows/(N-1.f));
+            pts[k++] = (point - c) * 0.85 + c;
+        }
 
-		cv::omnidir::undistortPoints(distorted0, undist1, this->K, this->D, xi, cv::noArray(), cv::noArray());
-		cv::Vec2d dis0 =(cv::Vec2d)*distorted0.ptr<cv::Vec2d>();
-		cv::Vec2d* u1 = undist1.ptr<cv::Vec2d>();
-		cv::Vec3d* u2 = undist2.ptr<cv::Vec3d>();
+        cv::omnidir::undistortPoints(distorted0, undist1, this->K, this->D, xi, cv::noArray(), cv::noArray());
+        cv::Vec2d dis0 =(cv::Vec2d)*distorted0.ptr<cv::Vec2d>();
+        cv::Vec2d* u1 = undist1.ptr<cv::Vec2d>();
+        cv::Vec3d* u2 = undist2.ptr<cv::Vec3d>();
         cv::Matx33d iK = K.inv(cv::DECOMP_SVD);
-		for(int i = 0; i  < (int)distorted0.total(); ++i)
-		{
+        for(int i = 0; i  < (int)distorted0.total(); ++i)
+        {
             cv::Vec3d temp1 = iK * cv::Vec3d(u1[i][0], u1[i][1], 1.0);
-		    double r2 = temp1[0]*temp1[0] + temp1[1]*temp1[1];
+            double r2 = temp1[0]*temp1[0] + temp1[1]*temp1[1];
             double a = (r2 + 1);
             double b = 2*xi*r2;
             double cc = r2*xi*xi-1;
             double Zs = (-b + sqrt(b*b - 4*a*cc))/(2*a);
             u2[i] = cv::Vec3d(temp1[0]*(Zs+xi), temp1[1]*(Zs+xi), Zs);
-		}
+        }
         cv::omnidir::distortPoints(undist1, distorted1, this->K, this->D, xi);
         cv::Vec2d dis1 =(cv::Vec2d)*distorted1.ptr<cv::Vec2d>();
         cv::omnidir::projectPoints(undist2, distorted2, cv::Vec3d::all(0), cv::Vec3d::all(0), this->K, this->D, xi, cv::noArray());
@@ -140,7 +140,7 @@ TEST_F(omnidirTest, jacobian)
     cv::Mat T2 = T + dT;
     cv::omnidir::projectPoints(X, x2, om, T2, K, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(3,6) * dT).reshape(2,1);
-	CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
     // Test on om
     cv::Mat dom(3, 1, CV_64FC1);
@@ -164,8 +164,8 @@ TEST_F(omnidirTest, jacobian)
     double ds = r.gaussian(1);
     ds *= 1e-9 * abs(s);
     double s2 = s + ds;
-	K2 = K;
-	K2(0,1) = s2;
+    K2 = K;
+    K2(0,1) = s2;
     cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(8,9)*ds).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
@@ -199,43 +199,43 @@ TEST_F(omnidirTest, jacobian)
 
 //TEST_F(omnidirTest, rectify)
 //{
-//	cv::Mat map11, map12;
+//    cv::Mat map11, map12;
 //
-//	
-//	cv::Mat img = cv::imread('..//');
-//	cv::omnidir::undistortImage()
+//    
+//    cv::Mat img = cv::imread('..//');
+//    cv::omnidir::undistortImage()
 //}
 
 TEST_F(omnidirTest, initial)
 {
-	// load pattern points and image points, you should assign your path of the corner file.
-	cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-	std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-	cv::Size imgSize;
-	fs["patternPoints"] >> v_patternPoints;
-	fs["imagePoints"] >> v_imagePoints;
-	fs["imageSize"] >> imgSize;
-	for (int i = 0; i < (int)v_imagePoints.size(); i++)
-	{
-		v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-		v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-	}
-	cv::Mat omAll, tAll, K;
-	std::vector<double> D(4);
-	D[0] = D[1] = D[2] = D[3] = 0;
-	cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K);
-	int nPoints = 0;
-	int nImg = v_patternPoints.size();
-	double reProjError = 0;
-	for (int i = 0; i < nImg; i++)
-	{
-		nPoints += (int)v_patternPoints[i].total();
-		cv::Mat imgPointsi;
-		cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
-		reProjError += cv::norm(imgPointsi - v_imagePoints[i], cv::NORM_L2);
-	}
-	double meanReProjError = reProjError / nPoints;
-	CV_Assert(meanReProjError < 4);
+    // load pattern points and image points, you should assign your path of the corner file.
+    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+    cv::Size imgSize;
+    fs["patternPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
+    for (int i = 0; i < (int)v_imagePoints.size(); i++)
+    {
+        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+    }
+    cv::Mat omAll, tAll, K;
+    std::vector<double> D(4);
+    D[0] = D[1] = D[2] = D[3] = 0;
+    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K);
+    int nPoints = 0;
+    int nImg = v_patternPoints.size();
+    double reProjError = 0;
+    for (int i = 0; i < nImg; i++)
+    {
+        nPoints += (int)v_patternPoints[i].total();
+        cv::Mat imgPointsi;
+        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
+        reProjError += cv::norm(imgPointsi - v_imagePoints[i], cv::NORM_L2);
+    }
+    double meanReProjError = reProjError / nPoints;
+    CV_Assert(meanReProjError < 4);
 }
 
 const cv::Size omnidirTest::imageSize(1280, 800);
@@ -255,7 +255,7 @@ const double omnidirTest::s = 0.01;
 const double omnidirTest::xi = 0.8;
 int main(int argc, char* argv[])
 {
-	testing::InitGoogleTest(&argc, argv);
-	return RUN_ALL_TESTS();
-	cv::waitKey();
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+    cv::waitKey();
 }

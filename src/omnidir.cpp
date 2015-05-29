@@ -50,7 +50,7 @@ namespace cv { namespace
         double ds;
         Matx12d dc;
         double dxi;
-        Matx14d dkp;	// distortion k1,k2,p1,p2
+        Matx14d dkp;    // distortion k1,k2,p1,p2
     };
 }}
 
@@ -66,7 +66,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
     Vec3d om = _rvec.depth() == CV_32F ? (Vec3d)*_rvec.getMat().ptr<Vec3f>() : *_rvec.getMat().ptr<Vec3d>();   
     Vec3d T  = _tvec.depth() == CV_32F ? (Vec3d)*_tvec.getMat().ptr<Vec3f>() : *_tvec.getMat().ptr<Vec3d>(); 
     Matx33d K = _K.getMat();
-    Vec<double, 4> kp= (Vec<double,4>)*_D.getMat().ptr<Vec<double,4>>();
+    Vec<double, 4> kp= (Vec<double,4>)*_D.getMat().ptr<Vec<double,4> >();
 
     Vec2d f,c;
     f = Vec2d(K(0,0),K(1,1));
@@ -132,7 +132,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
             Matx33d dXsdXc(r_1-Xc[0]*Xc[0]*r_3, -(Xc[0]*Xc[1])*r_3, -(Xc[0]*Xc[2])*r_3,
                            -(Xc[0]*Xc[1])*r_3, r_1-Xc[1]*Xc[1]*r_3, -(Xc[1]*Xc[2])*r_3,
                            -(Xc[0]*Xc[2])*r_3, -(Xc[1]*Xc[2])*r_3, r_1-Xc[2]*Xc[2]*r_3);
-            Matx23d dxudXs(1/(Xs[2]+xi),	0,	-Xs[0]/(Xs[2]+xi)/(Xs[2]+xi),
+            Matx23d dxudXs(1/(Xs[2]+xi),    0,    -Xs[0]/(Xs[2]+xi)/(Xs[2]+xi),
                            0,    1/(Xs[2]+xi),    -Xs[1]/(Xs[2]+xi)/(Xs[2]+xi));
             // pre-compute some reusable things
             double temp1 = 2*k1*xu[0] + 4*k2*xu[0]*r2;
@@ -280,10 +280,10 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     size_t n = distorted.total();
     for (size_t i = 0; i < n; i++)
     {
-        Vec2d pi = (Vec2d)srcd[i];	// image point
-        //Vec2d pw((pi[0]-c[0]/f[0], (pi[1]-c[1])/f[1]));	// unified image plane
+        Vec2d pi = (Vec2d)srcd[i];    // image point
+        //Vec2d pw((pi[0]-c[0]/f[0], (pi[1]-c[1])/f[1]));    // unified image plane
         Vec2d pp((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]-c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]);
-        Vec2d pu = pp;	// points without distortion
+        Vec2d pu = pp;    // points without distortion
         // remove distortion iteratively
         for (int j = 0; j < 10; j++)
         {
@@ -305,7 +305,7 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
         Vec3d Xs = Xw / cv::norm(Xw);
         // reproject to image
         Vec3d ppu = Vec3d(Xs[0]/(Xs[2]+xi), Xs[1]/(Xs[2]+xi), 1.0);
-        Vec3d pr = PP * ppu;	// apply rotation and may new camera matrix
+        Vec3d pr = PP * ppu;    // apply rotation and may new camera matrix
         //Vec2d fi(pr[0]/pr[2], pr[1]/pr[2]);
         //dstd[i] = Vec2d(pr[0]/pr[2], pr[1]/pr[2]);
         dstd[i] = Vec2d(pr[0], pr[1]);
@@ -517,10 +517,10 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
                 Mat((r1[1]*x + r2[1]*y + t[1])/2).copyTo(A.rowRange(0, n_point).col(0));
                 Mat((r1[0]*x + r2[0]*y + t[0])/2).copyTo(A.rowRange(n_point, 2*n_point).col(0));
                 Mat(-A.col(0).rowRange(0, n_point).mul(sqrRho)).copyTo(A.col(1).rowRange(0, n_point));
-				Mat(-A.col(0).rowRange(n_point, 2*n_point).mul(sqrRho)).copyTo(A.col(1).rowRange(n_point, 2*n_point));
+                Mat(-A.col(0).rowRange(n_point, 2*n_point).mul(sqrRho)).copyTo(A.col(1).rowRange(n_point, 2*n_point));
                 Mat(-v).copyTo(A.rowRange(0, n_point).col(2));
                 Mat(-u).copyTo(A.rowRange(n_point, 2*n_point).col(2));
-				
+                
                 // Operation to avoid bad numerical-condition of A
                 Vec3d maxA, minA;
                 for (int j = 0; j < A.cols; j++)
@@ -572,13 +572,13 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
                 }
             }
         }
-	}
+    }
         double gammaFinal = 0;
         for (int i = 0; i < (int)gammaAll.size(); i++)
             gammaFinal += gammaAll[i];
         gammaFinal = gammaFinal / gammaAll.size();
         _K = Mat(Matx33d(gammaFinal, 0, u0, 0, gammaFinal, v0, 0, 0, 1));
-		_K.convertTo(K, CV_64F);
+        _K.convertTo(K, CV_64F);
         cv::Mat(v_omAll).convertTo(omAll, CV_64FC3);
         cv::Mat(v_tAll).convertTo(tAll, CV_64FC3);
     
