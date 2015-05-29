@@ -61,7 +61,7 @@ namespace omnidir
 
 namespace internal
 {
-    void initializeCalibration(InputArray objectPoints, InputArray imagePoints, Size size, OutputArray RAll, OutputArray tAll, OutputArray K);
+    void initializeCalibration(InputArray patternPoints, InputArray imagePoints, Size size, OutputArray omAll, OutputArray tAll, OutputArray K);
 } // internal
 
     

@@ -431,7 +431,7 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// cv::omnidir::internal::initializeCalibration
 
-void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray _K)
+void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K)
 {
     
     double u0 = size.width / 2;
@@ -441,28 +441,24 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
 
     std::vector<cv::Vec3d> v_omAll(n_img), v_tAll(n_img);
     
-    std::vector<double> gammaAll;
+    std::vector<double> gammaAll(n_img);
 
-    _K.create(3, 3, CV_64F);
-    Mat K = _K.getMat();
+    K.create(3, 3, CV_64F);
+    Mat _K;
     for (int image_idx = 0; image_idx < n_img; ++image_idx)
     {
         cv::Mat objPoints = patternPoints.getMat(image_idx);
         cv::Mat imgPoints = imagePoints.getMat(image_idx);
         // objectPoints should be 3-channel data, imagePoints should be 2-channel data
         CV_Assert(objPoints.type() == CV_64FC3 && imgPoints.type() == CV_64FC2);
-        /*if (objPoints.cols > objPoints.rows)
-            objPoints = objPoints.t();
-        if (imgPoints.cols > imgPoints.rows)
-            imgPoints = imgPoints.t();*/
+
         vector<cv::Mat> xy, uv;
         cv::split(objPoints, xy);
         cv::split(imgPoints, uv);
-        //cv::Mat x = objPoints.col(0), y = objPoints.col(1);
-        //cv::Mat u = imgPoints.col(0) - u0, v = imgPoints.col(1) - v0;
+
         int n_point = imgPoints.rows * imgPoints.cols;
         cv::Mat x = xy[0].reshape(1, n_point), y = xy[1].reshape(1, n_point),
-                u = uv[0].reshape(1, n_point), v = uv[1].reshape(1, n_point);
+                u = uv[0].reshape(1, n_point) - u0, v = uv[1].reshape(1, n_point) - v0;
 
         cv::Mat sqrRho = u.mul(u) + v.mul(v);
         
@@ -476,13 +472,14 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
         Mat(u.mul(y)).copyTo(M.col(3));
         Mat(-v).copyTo(M.col(4));
         Mat(u).copyTo(M.col(5));
-        Mat V;
-        cv::SVD::compute(M, cv::noArray(), cv::noArray(), V);
+
+        Mat W,U,V;
+        cv::SVD::compute(M, W, U, V,SVD::FULL_UV);
         V = V.t();
 
         double miniReprojectError = 1e5;
         // the signs of r1, r2, r3 are unkown, so they can be flipped.
-        for (int coef = -1; coef == 1; coef+=2)
+        for (int coef = 1; coef >= -1; coef-=2)
         {
             double r11 = V.at<double>(0, 5) * coef;
             double r12 = V.at<double>(1, 5) * coef;
@@ -493,13 +490,14 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
 
             Mat roots;
             double r31s;
-            solvePoly(Matx13d((r11*r12+r21*r22)*(r11*r12+r21*r22), r11*r11+r21*r21-r12*r12-r22*r22, 1), roots, 50);
-            if (roots.at<Vec2d>(0)[1] == 0)
-                r31s = roots.at<Vec2d>(0)[0];
+            solvePoly(Matx13d(-(r11*r12+r21*r22)*(r11*r12+r21*r22), r11*r11+r21*r21-r12*r12-r22*r22, 1), roots);
+
+            if (roots.at<Vec2d>(0)[0] > 0)
+                r31s = sqrt(roots.at<Vec2d>(0)[0]);
             else
-                r31s = roots.at<Vec2d>(1)[0];
+                r31s = sqrt(roots.at<Vec2d>(1)[0]);
             
-            for (int coef2 = -1; coef == 1; coef+=2)
+            for (int coef2 = 1; coef2 >= -1; coef2-=2)
             {
                 double r31 = r31s * coef2;
                 double r32 = -(r11*r12 + r21*r22) / r31;
@@ -516,12 +514,13 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
                 // Form equations in Scaramuzza's paper
                 // A Toolbox for Easily Calibrating Omnidirectional Cameras 
                 Mat A(n_point*2, 3, CV_64F);
-                Mat(r1[1]*x + r2[1]*y + t[1]).copyTo(A.rowRange(0, n_point).col(0));
-                Mat(r1[0]*x + r2[0]*y + t[0]).copyTo(A.rowRange(n_point, 2*n_point).col(0));
-                Mat(-A.col(0)*sqrRho).copyTo(A.col(1));
+                Mat((r1[1]*x + r2[1]*y + t[1])/2).copyTo(A.rowRange(0, n_point).col(0));
+                Mat((r1[0]*x + r2[0]*y + t[0])/2).copyTo(A.rowRange(n_point, 2*n_point).col(0));
+                Mat(-A.col(0).rowRange(0, n_point).mul(sqrRho)).copyTo(A.col(1).rowRange(0, n_point));
+				Mat(-A.col(0).rowRange(n_point, 2*n_point).mul(sqrRho)).copyTo(A.col(1).rowRange(n_point, 2*n_point));
                 Mat(-v).copyTo(A.rowRange(0, n_point).col(2));
                 Mat(-u).copyTo(A.rowRange(n_point, 2*n_point).col(2));
-
+				
                 // Operation to avoid bad numerical-condition of A
                 Vec3d maxA, minA;
                 for (int j = 0; j < A.cols; j++)
@@ -552,17 +551,18 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
                 Mat patternPointsExt = Mat(R) * objPoints.reshape(1, 3) + cv::repeat(Mat(t), 1, n_point);
                 for (int i = 0; i < n_point; ++i)
                 {
-                    if (patternPointsExt.at<double>(2,i) >0)
+                    if (patternPointsExt.at<double>(2,i) <0)
                         continue;
                 }
 
                 // project pattern points to images
                 Mat projedImgPoints;
-                Matx33d K(gamma, 0, u0, 0, gamma, v0, 0, 0, 1);
+                Matx33d Kc(gamma, 0, u0, 0, gamma, v0, 0, 0, 1);
                 Matx14d D(0, 0, 0, 0);
-                cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, K, D, 1, cv::noArray());
+                cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, Kc, D, 1, cv::noArray());
                 double reprojectError = cv::norm(projedImgPoints - imgPoints, cv::NORM_L2);
-                // this reproject error is smaller
+
+                // if this reproject error is smaller
                 if (reprojectError < miniReprojectError)
                 {
                     miniReprojectError = reprojectError;
@@ -572,13 +572,14 @@ void cv::omnidir::internal::initializeCalibration(InputArrayOfArrays patternPoin
                 }
             }
         }
-
+	}
         double gammaFinal = 0;
         for (int i = 0; i < (int)gammaAll.size(); i++)
             gammaFinal += gammaAll[i];
         gammaFinal = gammaFinal / gammaAll.size();
-        K = Mat(Matx33d(gammaFinal, 0, u0, 0, gammaFinal, v0, 0, 0, 1));
+        _K = Mat(Matx33d(gammaFinal, 0, u0, 0, gammaFinal, v0, 0, 0, 1));
+		_K.convertTo(K, CV_64F);
         cv::Mat(v_omAll).convertTo(omAll, CV_64FC3);
         cv::Mat(v_tAll).convertTo(tAll, CV_64FC3);
-    }
+    
 }
