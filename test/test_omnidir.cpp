@@ -212,9 +212,9 @@ TEST_F(omnidirTest, initial)
     cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
     std::vector<cv::Mat> v_patternPoints, v_imagePoints;
     cv::Size imgSize;
-    fs["patternPoints"] > > v_patternPoints;
-    fs["imagePoints"] > > v_imagePoints;
-    fs["imageSize"] > > imgSize;
+    fs["patternPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
     for (int i = 0; i < (int)v_imagePoints.size(); i++)
     {
         v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
