@@ -52,6 +52,13 @@ protected:
     const static cv::Vec3d T;
     const static double xi;
     const static double s;
+    std::string datasets_repository_path;
+
+    virtual void SetUp() {
+        datasets_repository_path = combine(cvtest::TS::ptr()->get_data_path(), "cv/cameracalibration/omnidirectional");
+    }
+protected:
+    std::string combine(const std::string& _item1, const std::string& _item2);
 };
 TEST_F(omnidirTest, projectPoints)
 {
@@ -59,6 +66,7 @@ TEST_F(omnidirTest, projectPoints)
         rows = this->imageSize.height;
     double xi = this->xi;
     double s = this->s;
+
     const int N = 20;
     cv::Mat distorted0(1, N*N, CV_64FC2), undist1, undist2, distorted1, distorted2;
     undist2.create(distorted0.size(), CV_MAKETYPE(distorted0.depth(), 3));
@@ -197,15 +205,6 @@ TEST_F(omnidirTest, jacobian)
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 }
 
-//TEST_F(omnidirTest, rectify)
-//{
-//    cv::Mat map11, map12;
-//
-//    
-//    cv::Mat img = cv::imread('..//');
-//    cv::omnidir::undistortImage()
-//}
-
 TEST_F(omnidirTest, initial)
 {
     // load pattern points and image points, you should assign your path of the corner file.
@@ -235,13 +234,13 @@ TEST_F(omnidirTest, initial)
         reProjError += cv::norm(imgPointsi - v_imagePoints[i], cv::NORM_L2);
     }
     double meanReProjError = reProjError / nPoints;
-    CV_Assert(meanReProjError < 4);
+    CV_Assert(meanReProjError < 10);
 }
 
-const cv::Size omnidirTest::imageSize(1280, 800);
+const cv::Size omnidirTest::imageSize(1280, 960);
 
-const cv::Matx33d omnidirTest::K(558.478087865323,               0, 620.458515360843,
-                                 0, 560.506767351568, 381.939424848348,
+const cv::Matx33d omnidirTest::K(384.8114878905080,               0, 631.9609941699916,
+                                 0, 386.6814375399752, 432.6685449908914,
                                  0,               0,                1);
 
 const cv::Vec4d omnidirTest::D(-0.0014613319981768, -0.00329861110580401, 0.00605760088590183, -0.00374209380722371);
@@ -252,7 +251,25 @@ const cv::Vec3d omnidirTest::T(-9.9217369356044638e-02, 3.1741831972356663e-03, 
 
 const double omnidirTest::s = 0.01;
 
-const double omnidirTest::xi = 0.8;
+const double omnidirTest::xi = 0.936087907397598;
+
+std::string omnidirTest::combine(const std::string& _item1, const std::string& _item2)
+{
+    std::string item1 = _item1, item2 = _item2;
+    std::replace(item1.begin(), item1.end(), '\\', '/');
+    std::replace(item2.begin(), item2.end(), '\\', '/');
+
+    if (item1.empty())
+        return item2;
+
+    if (item2.empty())
+        return item1;
+
+    char last = item1[item1.size()-1];
+    return item1 + (last != '/' ? "/" : "") + item2;
+}
+
+
 int main(int argc, char* argv[])
 {
     testing::InitGoogleTest(&argc, argv);
