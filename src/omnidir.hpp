@@ -51,20 +51,24 @@ namespace omnidir
     void projectPoints(InputArray objectPoints, OutputArray imagePoints, InputArray rvec, InputArray tvec, 
                        InputArray K, InputArray D, double xi, OutputArray jacobian = noArray());
 
-    void undistortPoints(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray R);
+    void undistortPoints(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, 
+        double xi, InputArray R);
     
     void distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi);
 
-    void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, const cv::Size& size, int mltype, OutputArray map1, OutputArray map2);
+    void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, 
+        const cv::Size& size, int mltype, OutputArray map1, OutputArray map2);
     
-    void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size);
+    void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, 
+        double xi, InputArray Knew, const Size& new_size);
 
-    double calibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, InputOutputArray K, double& xi, InputOutputArray D, 
-        OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, int flags, TermCriteria criteria);
+    double calibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, 
+        InputOutputArray K, double& xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
+        int flags, TermCriteria criteria);
 
     double stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, 
-        Size imageSize, InputOutputArray K1, double& xi1, InputOutputArray D1, InputOutputArray K2, double& xi2, InputOutputArray D2, OutputArray R, 
-        OutputArray T, int flags, TermCriteria criteria);
+        Size imageSize, InputOutputArray K1, double& xi1, InputOutputArray D1, InputOutputArray K2, double& xi2, 
+        InputOutputArray D2, OutputArray R, OutputArray T, int flags, TermCriteria criteria);
 
     void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
         InputArray R, InputArray tvec, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2, OutputArray Q, int flags,
@@ -72,15 +76,20 @@ namespace omnidir
 
 namespace internal
 {
-    void initializeCalibration(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
+    void initializeCalibration(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, 
+        OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
 
-    void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE);
+    void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters,
+        Mat& JTJ_inv, Mat& JTE);
 
-    void encodeParameters(InputArray K, InputArrayOfArrays omAll, InputArrayOfArrays tAll, InputArray distortion, double xi, OutputArray parameters);
+    void encodeParameters(InputArray K, InputArrayOfArrays omAll, InputArrayOfArrays tAll, InputArray distortion,
+        double xi, OutputArray parameters);
 
-    void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distortion, double& xi);
+    void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
+        OutputArray distortion, double& xi);
 
-    void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Vec2d& std_error, double& rms);
+    void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters,
+        Vec2d& std_error, double& rms);
 
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
 
