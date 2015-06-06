@@ -51,47 +51,56 @@ protected:
     const static cv::Vec3d om;
     const static cv::Vec3d T;
     const static double xi;
-    const static double s;
+    std::string datasets_repository_path;
+
+    virtual void SetUp() {
+        datasets_repository_path = combine(cvtest::TS::ptr()->get_data_path(), "cv/cameracalibration/omnidirectional");
+    }
+protected:
+    std::string combine(const std::string& _item1, const std::string& _item2);
 };
 TEST_F(omnidirTest, projectPoints)
 {
     double cols = this->imageSize.width,
         rows = this->imageSize.height;
     double xi = this->xi;
-    double s = this->s;
+
     const int N = 20;
     cv::Mat distorted0(1, N*N, CV_64FC2), undist1, undist2, distorted1, distorted2;
     undist2.create(distorted0.size(), CV_MAKETYPE(distorted0.depth(), 3));
     cv::Vec2d* pts = distorted0.ptr<cv::Vec2d>();
 
     cv::Vec2d c(this->K(0, 2), this->K(1, 2));
+
     for(int y = 0, k = 0; y < N; ++y)
+    {
         for(int x = 0; x < N; ++x)
         {
             cv::Vec2d point(x*cols/(N-1.f), y*rows/(N-1.f));
             pts[k++] = (point - c) * 0.85 + c;
         }
+    }
+    cv::omnidir::undistortPoints(distorted0, undist1, this->K, this->D, xi, cv::noArray());
+    cv::Vec2d* u1 = undist1.ptr<cv::Vec2d>();
+    cv::Vec3d* u2 = undist2.ptr<cv::Vec3d>();
+    
+    // transform to unit sphere
+    for(int i = 0; i  < (int)distorted0.total(); ++i)
+    {
+        cv::Vec3d temp1 = cv::Vec3d(u1[i][0], u1[i][1], 1.0);
+        double r2 = temp1[0]*temp1[0] + temp1[1]*temp1[1];
+        double a = (r2 + 1);
+        double b = 2*xi*r2;
+        double cc = r2*xi*xi-1;
+        double Zs = (-b + sqrt(b*b - 4*a*cc))/(2*a);
+        u2[i] = cv::Vec3d(temp1[0]*(Zs+xi), temp1[1]*(Zs+xi), Zs);
+    }
+    cv::omnidir::distortPoints(undist1, distorted1, this->K, this->D, xi);
+    cv::Vec2d dis1 =(cv::Vec2d)*distorted1.ptr<cv::Vec2d>();
+    cv::omnidir::projectPoints(undist2, distorted2, cv::Vec3d::all(0), cv::Vec3d::all(0), this->K, this->D, xi, cv::noArray());
 
-        cv::omnidir::undistortPoints(distorted0, undist1, this->K, this->D, xi, cv::noArray(), cv::noArray());
-        cv::Vec2d dis0 =(cv::Vec2d)*distorted0.ptr<cv::Vec2d>();
-        cv::Vec2d* u1 = undist1.ptr<cv::Vec2d>();
-        cv::Vec3d* u2 = undist2.ptr<cv::Vec3d>();
-        cv::Matx33d iK = K.inv(cv::DECOMP_SVD);
-        for(int i = 0; i  < (int)distorted0.total(); ++i)
-        {
-            cv::Vec3d temp1 = iK * cv::Vec3d(u1[i][0], u1[i][1], 1.0);
-            double r2 = temp1[0]*temp1[0] + temp1[1]*temp1[1];
-            double a = (r2 + 1);
-            double b = 2*xi*r2;
-            double cc = r2*xi*xi-1;
-            double Zs = (-b + sqrt(b*b - 4*a*cc))/(2*a);
-            u2[i] = cv::Vec3d(temp1[0]*(Zs+xi), temp1[1]*(Zs+xi), Zs);
-        }
-        cv::omnidir::distortPoints(undist1, distorted1, this->K, this->D, xi);
-        cv::Vec2d dis1 =(cv::Vec2d)*distorted1.ptr<cv::Vec2d>();
-        cv::omnidir::projectPoints(undist2, distorted2, cv::Vec3d::all(0), cv::Vec3d::all(0), this->K, this->D, xi, cv::noArray());
-        CV_Assert(cv::norm(distorted0-distorted1)< 1e-9);
-        CV_Assert(cv::norm(distorted0-distorted2)< 1e-9);
+    EXPECT_LT(cv::norm(distorted0-distorted1), 1e-9);
+    EXPECT_LT(cv::norm(distorted0-distorted2), 1e-9);
 }
 TEST_F(omnidirTest, jacobian)
 {
@@ -127,9 +136,9 @@ TEST_F(omnidirTest, jacobian)
 
     cv::Mat x1, x2, xpred;
     cv::Matx33d K(f.at<double>(0), s, c.at<double>(0),
-                       0,       f.at<double>(1), c.at<double>(1),
-                       0,                 0,           1);
-    
+        0,       f.at<double>(1), c.at<double>(1),
+        0,                 0,           1);
+
     cv::Mat jacobians;
     cv::omnidir::projectPoints(X, x1, om, T, K, D, xi, jacobians);
 
@@ -140,7 +149,7 @@ TEST_F(omnidirTest, jacobian)
     cv::Mat T2 = T + dT;
     cv::omnidir::projectPoints(X, x2, om, T2, K, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(3,6) * dT).reshape(2,1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 
     // Test on om
     cv::Mat dom(3, 1, CV_64FC1);
@@ -149,7 +158,7 @@ TEST_F(omnidirTest, jacobian)
     cv::Mat om2 = om + dom;
     cv::omnidir::projectPoints(X, x2, om2, T, K, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(0,3) * dom).reshape(2,1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred) , 1e-10);
 
     // Test on f
     cv::Mat df(2, 1, CV_64FC1);
@@ -158,7 +167,7 @@ TEST_F(omnidirTest, jacobian)
     cv::Matx33d K2 = K + cv::Matx33d(df.at<double>(0), 0, 0, 0, df.at<double>(1), 0, 0, 0, 1);
     cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(6,8)* df).reshape(2, 1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 
     // Test on s
     double ds = r.gaussian(1);
@@ -168,7 +177,7 @@ TEST_F(omnidirTest, jacobian)
     K2(0,1) = s2;
     cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(8,9)*ds).reshape(2, 1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 
     // Test on c
     cv::Mat dc(2, 1, CV_64FC1);
@@ -177,7 +186,7 @@ TEST_F(omnidirTest, jacobian)
     K2 = K + cv::Matx33d(0, 0, dc.at<double>(0), 0, 0, dc.at<double>(1), 0, 0, 1);
     cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(9,11)*dc).reshape(2, 1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 
     // Test on xi
     double dxi = r.gaussian(1);
@@ -185,7 +194,7 @@ TEST_F(omnidirTest, jacobian)
     double xi2 = xi + dxi;
     cv::omnidir::projectPoints(X, x2, om, T, K, D, xi2, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(11,12)*dxi).reshape(2, 1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 
     // Test on kp
     cv::Mat dD(4, 1, CV_64FC1);
@@ -194,83 +203,15 @@ TEST_F(omnidirTest, jacobian)
     cv::Mat D2 = D + dD;
     cv::omnidir::projectPoints(X, x2, om, T, K, D2, xi, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(12,16)*dD).reshape(2, 1);
-    CV_Assert(cv::norm(x2 - xpred) < 1e-10);
+    EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 }
 
-//TEST_F(omnidirTest, rectify)
-//{
-//    cv::Mat map11, map12;
-//
-//    
-//    cv::Mat img = cv::imread('..//');
-//    cv::omnidir::undistortImage()
-//}
 
-TEST_F(omnidirTest, initial)
-{
-    // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-    cv::Size imgSize;
-    fs["patternPoints"] >> v_patternPoints;
-    fs["imagePoints"] >> v_imagePoints;
-    fs["imageSize"] >> imgSize;
-    for (int i = 0; i < (int)v_imagePoints.size(); i++)
-    {
-        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-    }
-    cv::Mat omAll, tAll, K;
-    std::vector<double> D(4);
-    D[0] = D[1] = D[2] = D[3] = 0;
-    double xi;
-    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
-    int nPoints = 0;
-    int nImg = v_patternPoints.size();
-    std::vector<cv::Mat> projImgPoints;
-    for (int i = 0; i < nImg; i++)
-    {
-        nPoints += (int)v_patternPoints[i].total();
-        cv::Mat imgPointsi;
-        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
-        projImgPoints.push_back(imgPointsi);
-    }
-    double meanReprojError = cv::omnidir::internal::computeMeanReproerr(v_imagePoints, projImgPoints);
-    //double rms = sqrt(reProjError/nPoints);
-    //double meanReProjError = reProjError / nPoints;
-    EXPECT_LT(meanReprojError, 20);
-}
+const cv::Size omnidirTest::imageSize(1280, 960);
 
-TEST_F(omnidirTest, calibration)
-{ 
-    // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-    cv::Size imgSize;
-    fs["patternPoints"] >> v_patternPoints;
-    fs["imagePoints"] >> v_imagePoints;
-    fs["imageSize"] >> imgSize;
-
-    std::vector<cv::Mat> pattern_input, image_input;
-    for (int i = 0; i < 1; i++)
-    {
-        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-        pattern_input.push_back(v_patternPoints[i]);
-        image_input.push_back(v_imagePoints[i]);
-    }
-    cv::Mat K, D, omAll, tAll;
-    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.01);
-    double xi ;
-    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, critia);
-    EXPECT_LT(rms, 1);
-}
-
-const cv::Size omnidirTest::imageSize(1280, 800);
-
-const cv::Matx33d omnidirTest::K(558.478087865323,               0, 620.458515360843,
-                                 0, 560.506767351568, 381.939424848348,
-                                 0,               0,                1);
+const cv::Matx33d omnidirTest::K(384.8114878905080,               0, 631.9609941699916,
+    0, 386.6814375399752, 432.6685449908914,
+    0,               0,                1);
 
 const cv::Vec4d omnidirTest::D(-0.0014613319981768, -0.00329861110580401, 0.00605760088590183, -0.00374209380722371);
 
@@ -278,12 +219,27 @@ const cv::Vec3d omnidirTest::om(0.0001, -0.02, 0.02);
 
 const cv::Vec3d omnidirTest::T(-9.9217369356044638e-02, 3.1741831972356663e-03, 1.8551007952921010e-04);
 
-const double omnidirTest::s = 0.01;
+const double omnidirTest::xi = 0.936087907397598;
 
-const double omnidirTest::xi = 0.8;
+std::string omnidirTest::combine(const std::string& _item1, const std::string& _item2)
+{
+    std::string item1 = _item1, item2 = _item2;
+    std::replace(item1.begin(), item1.end(), '\\', '/');
+    std::replace(item2.begin(), item2.end(), '\\', '/');
+
+    if (item1.empty())
+        return item2;
+
+    if (item2.empty())
+        return item1;
+
+    char last = item1[item1.size()-1];
+    return item1 + (last != '/' ? "/" : "") + item2;
+}
+
+
 int main(int argc, char* argv[])
 {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
-    cv::waitKey();
 }
