@@ -223,19 +223,49 @@ TEST_F(omnidirTest, initial)
     cv::Mat omAll, tAll, K;
     std::vector<double> D(4);
     D[0] = D[1] = D[2] = D[3] = 0;
-    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K);
+    double xi;
+    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
+    std::cout << K << std::endl;
+    std::cout << omAll <<std::endl;
     int nPoints = 0;
     int nImg = v_patternPoints.size();
-    double reProjError = 0;
+    std::vector<cv::Mat> projImgPoints;
     for (int i = 0; i < nImg; i++)
     {
         nPoints += (int)v_patternPoints[i].total();
         cv::Mat imgPointsi;
         cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
-        reProjError += cv::norm(imgPointsi - v_imagePoints[i], cv::NORM_L2);
+        projImgPoints.push_back(imgPointsi);
     }
-    double meanReProjError = reProjError / nPoints;
-    CV_Assert(meanReProjError < 4);
+    double meanReprojError = cv::omnidir::internal::computeMeanReproerr(v_imagePoints, projImgPoints);
+    //double rms = sqrt(reProjError/nPoints);
+    //double meanReProjError = reProjError / nPoints;
+    EXPECT_LT(meanReprojError, 20);
+}
+
+TEST_F(omnidirTest, calibration)
+{ 
+    // load pattern points and image points, you should assign your path of the corner file.
+    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+    cv::Size imgSize;
+    fs["patternPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
+
+    std::vector<cv::Mat> pattern_input, image_input;
+    for (int i = 0; i < 1; i++)
+    {
+        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+        pattern_input.push_back(v_patternPoints[i]);
+        image_input.push_back(v_imagePoints[i]);
+    }
+    cv::Mat K, D, omAll, tAll;
+    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.01);
+    double xi ;
+    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, critia);
+    EXPECT_LT(rms, 1);
 }
 
 const cv::Size omnidirTest::imageSize(1280, 800);

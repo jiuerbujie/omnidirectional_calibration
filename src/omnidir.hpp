@@ -59,9 +59,15 @@ namespace omnidir
     
     void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size);
 
+    double calibrate(InputArrayOfArrays patternPoints, InputArrayOfArrays imagePoints, Size size, InputOutputArray K, double& xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, TermCriteria criteria);
 namespace internal
 {
-    void initializeCalibration(InputArray patternPoints, InputArray imagePoints, Size size, OutputArray omAll, OutputArray tAll, OutputArray K);
+    void initializeCalibration(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
+    void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE);
+    void encodeParameters(InputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, InputArray distoaration, double xi, int n, OutputArray parameters);
+    void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distoration, double& xi);
+    void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Vec2d& std_error, double& rms);
+    double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
 } // internal
 
     
