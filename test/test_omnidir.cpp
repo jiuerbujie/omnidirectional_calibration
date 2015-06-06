@@ -225,8 +225,6 @@ TEST_F(omnidirTest, initial)
     D[0] = D[1] = D[2] = D[3] = 0;
     double xi;
     cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
-    std::cout << K << std::endl;
-    std::cout << omAll <<std::endl;
     int nPoints = 0;
     int nImg = v_patternPoints.size();
     std::vector<cv::Mat> projImgPoints;
