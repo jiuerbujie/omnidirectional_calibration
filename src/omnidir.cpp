@@ -41,8 +41,7 @@
 //M*/
 
 #include "omnidir.hpp"
-#include <fstream>
-#include <iostream>
+
 namespace cv { namespace
 {
     struct JacobianRow
@@ -61,8 +60,13 @@ namespace cv { namespace
 void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints, 
                 InputArray rvec, InputArray tvec, InputArray K, InputArray D, double xi, OutputArray jacobian)
 {
-    CV_Assert(objectPoints.type() == CV_32FC3 || objectPoints.type() == CV_64FC3);
-    
+	// only support CV_64FC3 so far
+    CV_Assert(objectPoints.type() == CV_64FC3);
+	CV_Assert(rvec.type() == CV_64F && rvec.total() == 3);
+    CV_Assert(tvec.type() == CV_64F && tvec.total() == 3);
+	CV_Assert(K.type() == CV_64F && K.size() == Size(3,3));
+	CV_Assert(D.type() == CV_64F && D.total() == 4);
+
     // each row is an image point
     imagePoints.create(objectPoints.size(), CV_MAKETYPE(objectPoints.depth(), 2));
     size_t n = objectPoints.total();
@@ -192,6 +196,9 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
 void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi)
 {
     CV_Assert(undistorted.type() == CV_64FC2);
+	CV_Assert(K.type() == CV_64F && K.size() == Size(3,3));
+	CV_Assert(D.type() == CV_64F && D.total() == 4);
+
     distorted.create(undistorted.size(), undistorted.type());
     size_t n = undistorted.total();
 
@@ -236,7 +243,7 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     undistorted.create(distorted.size(), distorted.type());
     
     CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
-    CV_Assert(D.total() == 4 && K.size() == Size(3, 3) && K.depth() == CV_64F);
+    CV_Assert(D.type() == CV_64F && D.total() == 4 && K.size() == Size(3, 3) && K.depth() == CV_64F);
 
     cv::Vec2d f, c;
     Matx33d camMat = K.getMat();
