@@ -43,7 +43,7 @@
 #define __OPENCV_OMNIDIR_HPP__
 
 #include "precomp.hpp"
-#include <iostream>
+
 namespace cv
 {
 namespace omnidir
@@ -76,7 +76,7 @@ namespace omnidir
 
 namespace internal
 {
-    void initializeCalibration(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, Size size, 
+    void initializeCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints, Size size, 
         OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
 
     void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters,
@@ -91,7 +91,7 @@ namespace internal
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters,
         Vec2d& std_error, double& rms);
 
-    double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
+    double computeMeanReproErr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
 
     double median(InputArray row);
 
