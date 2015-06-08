@@ -10,9 +10,8 @@
 //                           License Agreement
 //                For Open Source Computer Vision Library
 //
-// Copyright (C) 2000-2008, Intel Corporation, all rights reserved.
-// Copyright (C) 2009-2011, Willow Garage Inc., all rights reserved.
-// Third party copyrights are property of their respective owners.
+// Copyright (C) 2015, Baisheng Lai (laibaisheng@gmail.com), Zhejiang University,
+// all rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification,
 // are permitted provided that the following conditions are met:
@@ -40,6 +39,23 @@
 //
 //M*/
 
+/**
+ * This module was accepted as a GSoC 2015 project for OpenCV, authored by
+ * Baisheng Lai, mentored by Bo Li.
+ *
+ * The omnidirectional camera in this module is denoted by the catadioptric
+ * model. Please refer to Mei's paper for details of the camera model:
+ *
+ *      C. Mei and P. Rives, “Single view point omnidirectional camera
+ *      calibration from planar grids,” in ICRA 2007.
+ *
+ * The implementation of the calibration part is based on Li's calibration
+ * toolbox:
+ *
+ *     B. Li, L. Heng, K. Köser and M. Pollefeys, "A Multiple-Camera System
+ *     Calibration Toolbox Using A Feature Descriptor-Based Calibration
+ *     Pattern", in IROS 2013.
+ */
 #include "omnidir.hpp"
 #include <fstream>
 #include <iostream>
@@ -435,6 +451,7 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 
 void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi)
 {
+    // For details please refer to Section III from Li's IROS 2013 paper
     
     double u0 = size.width / 2;
     double v0 = size.height / 2;
@@ -465,8 +482,6 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
         
         cv::Mat sqrRho = u.mul(u) + v.mul(v);
         // compute extrinsic parameters
-        // Form equation for te essential matrix, see Scaramuzza's paper:
-        // A Toolbox for Easily Calibrating Omnidirectional Cameras 
         cv::Mat M(n_point, 6, CV_64F);
         Mat(-v.mul(x)).copyTo(M.col(0));
         Mat(-v.mul(y)).copyTo(M.col(1));
