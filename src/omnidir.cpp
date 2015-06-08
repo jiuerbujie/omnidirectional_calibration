@@ -47,7 +47,7 @@
  * model. Please refer to Mei's paper for details of the camera model:
  *
  *      C. Mei and P. Rives, “Single view point omnidirectional camera
- *      calibration from planar grids,” in ICRA 2007.
+ *      calibration from planar grids,�?in ICRA 2007.
  *
  * The implementation of the calibration part is based on Li's calibration
  * toolbox:
@@ -212,6 +212,9 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
 void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi)
 {
     CV_Assert(undistorted.type() == CV_64FC2);
+    CV_Assert(K.type() == CV_64F && K.size() == Size(3,3));
+    CV_Assert(D.type() == CV_64F && D.total() == 4);
+
     distorted.create(undistorted.size(), undistorted.type());
     size_t n = undistorted.total();
 
@@ -225,20 +228,21 @@ void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, I
     Matx33d camMat = K.getMat();
     f = Vec2d(camMat(0,0), camMat(1,1));
     c = Vec2d(camMat(0,2), camMat(1,2));
-    double s = camMat(0,1);
     const Vec2d *srcd = undistorted.getMat().ptr<Vec2d>();
     Vec2d *desd = distorted.getMat().ptr<Vec2d>();
 
     for (size_t i = 0; i < n; i++)
     {
-        Vec2d pi = srcd[i];    // image points
-        Vec2d xu((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]-c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]); // unified image plane
+        // camera plane
+        Vec2d xu = srcd[i];
         double r2 = xu[0]*xu[0] + xu[1]*xu[1];
         double r4 = r2*r2;
+
         // add distortion
         Vec2d xd;
         xd[0] = (1+k[0]*r2+k[1]*r4)*xu[0] + 2*p[0]*xu[0]*xu[1] + p[1]*(r2+2*xu[0]*xu[0]);
         xd[1] = (1+k[0]*r2+k[1]*r4)*xu[1] + p[0]*(r2+2*xu[1]*xu[1]) + 2*p[1]*xu[0]*xu[1];
+
         // project to image
         Vec3d pr = camMat * Vec3d(xd[0], xd[1], 1);
         desd[i] = Vec2d(pr[0],pr[1]);
@@ -250,14 +254,13 @@ void cv::omnidir::distortPoints(InputArray undistorted, OutputArray distorted, I
 /////////////////////////////////////////////////////////////////////////////
 //////// undistortPoints
 void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted, 
-                         InputArray K, InputArray D, double xi, InputArray R, InputArray P)
+    InputArray K, InputArray D, double xi, InputArray R)
 {
     CV_Assert(distorted.type() == CV_64FC2);
     undistorted.create(distorted.size(), distorted.type());
-    
-    CV_Assert(P.empty() || P.size() == Size(3,3) || P.size() == Size(4,3));
+
     CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
-    CV_Assert(D.total() == 4 && K.size() == Size(3, 3) && K.depth() == CV_64F);
+    CV_Assert(D.type() == CV_64F && D.total() == 4 && K.size() == Size(3, 3) && K.depth() == CV_64F);
 
     cv::Vec2d f, c;
     Matx33d camMat = K.getMat();
@@ -274,24 +277,13 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     {
         cv::Vec3d rvec;
         R.getMat().convertTo(rvec, CV_64F);
-        //RR = cv::Affine3d(rvec).rotation();
         cv::Rodrigues(rvec, RR);
     }
     else if (!R.empty() && R.size() == Size(3,3))
     {
         R.getMat().convertTo(RR, CV_64F);
     }
-    cv::Matx33d PP;
-    if(!P.empty())
-    {
-        P.getMat().colRange(0, 3).convertTo(PP, CV_64F);
-        //RR = PP * RR;
-    }
-    else
-    {
-        //RR = camMat * RR; 
-        PP = camMat;    //use old camera matrix
-    }
+
     const cv::Vec2d *srcd = distorted.getMat().ptr<cv::Vec2d>();
     cv::Vec2d *dstd = undistorted.getMat().ptr<cv::Vec2d>();
 
@@ -299,17 +291,18 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     for (size_t i = 0; i < n; i++)
     {
         Vec2d pi = (Vec2d)srcd[i];    // image point
-        //Vec2d pw((pi[0]-c[0]/f[0], (pi[1]-c[1])/f[1]));    // unified image plane
-        Vec2d pp((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]-c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]);
+        Vec2d pp((pi[0]*f[1]-c[0]*f[1]-s*(pi[1]-c[1]))/(f[0]*f[1]), (pi[1]-c[1])/f[1]); //plane
         Vec2d pu = pp;    // points without distortion
+
         // remove distortion iteratively
-        for (int j = 0; j < 10; j++)
+        for (int j = 0; j < 20; j++)
         {
             double r2 = pu[0]*pu[0] + pu[1]*pu[1];
             double r4 = r2*r2;
             pu[0] = (pp[0] - 2*p[0]*pu[0]*pu[1] - p[1]*(r2+2*pu[0]*pu[0])) / (1 + k[0]*r2 + k[1]*r4);
             pu[1] = (pp[1] - 2*p[1]*pu[0]*pu[1] - p[0]*(r2+2*pu[1]*pu[1])) / (1 + k[0]*r2 + k[1]*r4);
         }
+
         // project to unit sphere
         double r2 = pu[0]*pu[0] + pu[1]*pu[1];
         double a = (r2 + 1);
@@ -317,16 +310,17 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
         double cc = r2*xi*xi-1;
         double Zs = (-b + sqrt(b*b - 4*a*cc))/(2*a);
         Vec3d Xw = Vec3d(pu[0]*(Zs + xi), pu[1]*(Zs +xi), Zs);
+
         // rotate
         Xw = RR * Xw;
+
         // project back to sphere
         Vec3d Xs = Xw / cv::norm(Xw);
-        // reproject to image
+
+        // reproject to camera plane
         Vec3d ppu = Vec3d(Xs[0]/(Xs[2]+xi), Xs[1]/(Xs[2]+xi), 1.0);
-        Vec3d pr = PP * ppu;    // apply rotation and may new camera matrix
-        //Vec2d fi(pr[0]/pr[2], pr[1]/pr[2]);
-        //dstd[i] = Vec2d(pr[0]/pr[2], pr[1]/pr[2]);
-        dstd[i] = Vec2d(pr[0], pr[1]);
+
+        dstd[i] = Vec2d(ppu[0], ppu[1]);
     }
 }
 
