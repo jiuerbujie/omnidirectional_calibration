@@ -335,10 +335,12 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
     map2.create( size, map1.type() == CV_16SC2 ? CV_16UC1 : CV_32F );
     
     CV_Assert((K.depth() == CV_32F || K.depth() == CV_64F) && (D.depth() == CV_32F || D.depth() == CV_64F));
-    CV_Assert((P.depth() == CV_32F || P.depth() == CV_64F) && (R.depth() == CV_32F || R.depth() == CV_64F));
     CV_Assert(K.size() == Size(3, 3) && (D.empty() || D.total() == 4));
-    CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
+    CV_Assert(P.empty()|| (P.depth() == CV_32F || P.depth() == CV_64F));
     CV_Assert(P.empty() || P.size() == Size(3, 3) || P.size() == Size(4, 3));  
+    CV_Assert(R.empty() || (R.depth() == CV_32F || R.depth() == CV_64F));
+    CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
+    
     
     cv::Vec2d f, c;
     double s;
@@ -435,6 +437,7 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 {
     Size size = new_size.area() != 0 ? new_size : distorted.size();
 
+
     cv::Mat map1, map2;
     omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
     cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
@@ -453,10 +456,10 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
     int n_img = (int)imagePoints.total();
 
     std::vector<cv::Vec3d> v_omAll(n_img), v_tAll(n_img);
-    std::vector<cv::Matx33d> v_RAll(n_img);
     
-    std::vector<double> gammaAll(n_img);
+    std::vector<double> gammaAll(n_img), reProjErrorAll(n_img);
 
+    std::vector<cv::Mat> patternPointsFilter, imagePointsFilter;
     K.create(3, 3, CV_64F);
     Mat _K;
     for (int image_idx = 0; image_idx < n_img; ++image_idx)
@@ -557,69 +560,32 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
                           r1[2], r2[2], r3[2]);
                 Vec3d om;
                 Rodrigues(R, om);
-                // pattern points after applied rotation and translation, if it is behind of camera, then
-                // the signs of parameters are invalid. 
-                Mat objtmp = Mat::zeros(3, n_point, CV_64F);
-                Mat(x.t()).copyTo(objtmp.row(0));
-                Mat(y.t()).copyTo(objtmp.row(1));
-                Mat patternPointsExt = Mat(R) * objtmp + cv::repeat(Mat(t), 1, n_point);
                 
-                
-                bool invalidate = false;
-                for (int i = 0; i < n_point; ++i)
-                {
-                    if (patternPointsExt.at<double>(2,i) <0)
-                        invalidate = true;
-                }
-                if (invalidate)
-                    continue;
                 // project pattern points to images
                 Mat projedImgPoints;
                 Matx33d Kc(gamma, 0, u0, 0, gamma, v0, 0, 0, 1);
-                Matx14d D(0, 0, 0, 0);
-                cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, Kc, D, 1, cv::noArray());
+                
+                // reproj error
+                cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, Kc, Matx14d(0, 0, 0, 0), 1, cv::noArray());
                 double reprojectError = omnidir::internal::computeMeanReproerr(imgPoints, projedImgPoints);
 
                 // if this reproject error is smaller
                 if (reprojectError < miniReprojectError)
                 {
                     miniReprojectError = reprojectError;
+                    reProjErrorAll[image_idx] = miniReprojectError;
                     v_omAll[image_idx] = om;
-                    v_RAll[image_idx] = R;
                     v_tAll[image_idx] = t;
                     gammaAll[image_idx] = gamma;
                 }
             }
         }
     }
-    std::ofstream fout("myResult.txt");
-    fout << "R" <<std::endl;
-    for (int i = 0; i < n_img; i++)
-    {
-        fout << v_RAll[i] << std::endl;
-    }
-    fout <<std::endl;
-    fout << "T" <<std::endl;
-    for (int i = 0; i < n_img; i++)
-    {
-        fout << v_tAll[i] << std::endl;
-    }
-    fout <<std::endl;
-    fout << "All gammma" << std::endl;
-    for (int i = 0; i < n_img; i++)
-    {
-        fout << gammaAll[i] << std::endl;
-    }
-
-    vector<double>::iterator it;
+    
+    // filter initial results whose reproject errors are too large
+    std::vector<double> reProjErrorFilter,v_gammaFilter;
+    std::vector<Vec3d> omFilter, tFilter;
     double gammaFinal = 0;
-    for(it=gammaAll.begin();it!=gammaAll.end();)
-                {
-                    if(*it  ==0)
-                        it=gammaAll.erase(it);      
-                    else
-                        ++it;    
-        }
 
     // choose median value
     size_t n = gammaAll.size() / 2;
@@ -628,9 +594,35 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
 
     _K = Mat(Matx33d(gammaFinal, 0, u0, 0, gammaFinal, v0, 0, 0, 1));
     _K.convertTo(K, CV_64F);
-    cv::Mat(v_omAll).convertTo(omAll, CV_64FC3);
-    cv::Mat(v_tAll).convertTo(tAll, CV_64FC3);
-    // write to file
+
+    // recompute reproject error using the final gamma
+    for (int i = 0; i< n_img; i++)
+    {
+        Mat _projected;
+        cv::omnidir::projectPoints(patternPoints.getMat(i), _projected, v_omAll[i], v_tAll[i], _K, Matx14d(0, 0, 0, 0), 1, cv::noArray());
+        double _error = omnidir::internal::computeMeanReproerr(imagePoints.getMat(i), _projected);
+        if(_error < 50)
+        {
+            reProjErrorFilter.push_back(_error);
+            omFilter.push_back(v_omAll[i]);
+            tFilter.push_back(v_tAll[i]);
+            patternPointsFilter.push_back(patternPoints.getMat(i).clone());
+            imagePointsFilter.push_back(imagePoints.getMat(i).clone());
+        }
+    }
+
+    cv::Mat(omFilter).convertTo(omAll, CV_64FC3);
+    cv::Mat(tFilter).convertTo(tAll, CV_64FC3);
+   
+    int depth1 = patternPoints.depth(), depth2 = imagePoints.depth();
+    patternPoints.create(Size(1, patternPointsFilter.size()), CV_MAKETYPE(depth1,3));
+    imagePoints.create(Size(1, patternPointsFilter.size()), CV_MAKETYPE(depth2,2));
+
+    for(int i = 0; i < (int)patternPointsFilter.size(); ++i)
+    {
+        patternPointsFilter[i].copyTo(patternPoints.getMat(i));
+        imagePointsFilter[i].copyTo(imagePoints.getMat(i));
+    }
 
     xi = 1;
 }
@@ -646,9 +638,10 @@ void cv::omnidir::internal::computeJacobian(InputArrayOfArrays objectPoints, Inp
     size_t n = objectPoints.total();
 
     Mat JTJ = Mat::zeros(10 + 6*n, 10 + 6*n, CV_64F);
+    JTJ_inv = Mat::zeros(10 + 6*n, 10 + 6*n, CV_64F);
     JTE = Mat::zeros(10 + 6*n, 1, CV_64F);
-    //Mat J = Mat::zeros(n*objectPoints.getMat(0).total(), 10+6*n, CV_64F);
-
+    Mat J = Mat::zeros(2*n*objectPoints.getMat(0).total(), 10+6*n, CV_64F);
+    Mat exAll = Mat::zeros(2*n*objectPoints.getMat(0).total(), 1, CV_64F);
     double *para = parameters.getMat().ptr<double>();
     Matx33d K(para[6*n], para[6*n+2], para[6*n+3],
         0,    para[6*n+1], para[6*n+4],
@@ -666,27 +659,32 @@ void cv::omnidir::internal::computeJacobian(InputArrayOfArrays objectPoints, Inp
         Mat imgProj, jacobian;
         omnidir::projectPoints(objPoints, imgProj, om, T, K, D, xi, jacobian);
         Mat projError = imgPoints - imgProj;
-        
+
         // The intrinsic part of Jacobian 
         Mat JIn(jacobian.rows, 10, CV_64F);
         Mat JEx(jacobian.rows, 6, CV_64F);
-
-        JIn = jacobian.colRange(6, 16).clone();
-        JEx = jacobian.colRange(0, 6).clone();
+        
+        jacobian.colRange(6, 16).copyTo(JIn);
+        jacobian.colRange(0, 6).copyTo(JEx);
 
         JTJ(Rect(6*n, 6*n, 10, 10)) = JTJ(Rect(6*n, 6*n, 10, 10)) + JIn.t()*JIn;
+
         JTJ(Rect(i*6, i*6, 6, 6)) = JEx.t() * JEx;
 
         Mat JExTIn = JEx.t() * JIn;
 
-        JTJ(Rect(6*n, i*6, 10, 6)) = JExTIn;
+        JExTIn.copyTo(JTJ(Rect(6*n, i*6, 10, 6)));
 
-        JTJ(Rect(i*6, 6*n, 6, 10)) = JExTIn.t();
+        Mat(JIn.t()*JEx).copyTo(JTJ(Rect(i*6, 6*n, 6, 10)));
 
         JTE(Rect(0, 6*n, 1, 10)) = JTE(Rect(0, 6*n,1, 10)) + JIn.t() * projError.reshape(1, 2*projError.rows);
         JTE(Rect(0, i*6, 1, 6)) = JEx.t() * projError.reshape(1, 2*projError.rows);
+
     }
-    JTJ_inv = JTJ.inv();
+
+    // in case JTJ is singular
+    double epsilon = 1e-9;
+    JTJ_inv = Mat(JTJ+epsilon).inv();
 }
 
 double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size, 
@@ -697,15 +695,13 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     CV_Assert(patternPoints.type() == CV_64FC3 && imagePoints.type() == CV_64FC2);
     CV_Assert((!K.empty() && K.size() == Size(3,3)) || K.empty());
     CV_Assert((!D.empty() && D.total() == 4) || D.empty());
-    
-    
+   
+    // initialization
+    cv::omnidir::internal::initializeCalibration(patternPoints, imagePoints, size, omAll, tAll, K, xi);
+    //double repr = 
     int n = (int)patternPoints.total();
     Mat finalParam(1, 10 + 6*n, CV_64F);
     Mat currentParam(1, 10 + 6*n, CV_64F);
-
-    // initialization
-    cv::omnidir::internal::initializeCalibration(patternPoints, imagePoints, size, omAll, tAll, K, xi);
-    
     cv::omnidir::internal::encodeParameters(K, omAll, tAll, Mat::zeros(1,4,CV_64F), xi, n, currentParam);
 
     // optimization
@@ -724,13 +720,22 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
         cv::omnidir::internal::computeJacobian(patternPoints, imagePoints, currentParam, JTJ_inv, JTError);
 
         // Gauss¨CNewton
-        Mat G = 0.1 * JTJ_inv * JTError;
+        Mat G = alpha_smooth2*JTJ_inv * JTError;
+
+        if (flags == CALIB_FIX_SKEW)
+        {
+            G.at<double>(n*6 + 2) = 0;
+        }
+
         finalParam = currentParam + G.t();
+
+        change = norm(G) / norm(currentParam);
+
         currentParam = finalParam.clone();
         
     }
     cv::omnidir::internal::decodeParameters(currentParam, K, omAll, tAll, D, xi);
-    
+
     std::vector<Mat> proImagePoints;
     
     for (int i = 0; i < n; ++i)
@@ -742,7 +747,9 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     double meanRepr = omnidir::internal::computeMeanReproerr(imagePoints, proImagePoints);
     Vec2d std_error;
     double rms;
-    cv::omnidir::internal::estimateUncertainties(patternPoints, imagePoints, finalParam, std_error, rms);
+    Mat errors;
+
+    cv::omnidir::internal::estimateUncertainties(patternPoints, imagePoints, finalParam, errors, std_error, rms, flags);
 
     return rms;
 }
@@ -780,7 +787,7 @@ void cv::omnidir::internal::encodeParameters(InputArray K, OutputArrayOfArrays o
  {
     if(K.empty())
         K.create(3,3,CV_64F);
-    Matx33d _K = K.getMat();
+    Matx33d _K;
     int n = (int)(paramsters.total()-10)/6;
     if(omAll.empty())
         omAll.create(1, n, CV_64FC3);
@@ -803,11 +810,12 @@ void cv::omnidir::internal::encodeParameters(InputArray K, OutputArrayOfArrays o
         param.colRange(i*6+3, i*6+6).reshape(3, 1).copyTo(tAll.getMat(i));
     }
     Mat(_D).convertTo(distoration, CV_64F);
-    
+    Mat(_K).convertTo(K, CV_64F);
     
  }
 
-void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Vec2d& std_error, double& rms)
+void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, 
+    Mat& errors, Vec2d& std_error, double& rms, int flags)
 {
     CV_Assert(!objectPoints.empty() && objectPoints.type() == CV_64FC3);
     CV_Assert(!imagePoints.empty() && imagePoints.type() == CV_64FC2);
@@ -846,8 +854,30 @@ void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoint
     meanStdDev(reprojError, noArray(), std_error);
     std_error *= sqrt((double)reprojError.total()/((double)reprojError.total() - 1.0));
 
-    rms  = cv::norm(reprojError);
-    rms = sqrt(rms*rms/reprojError.total());
+    Mat simga_x;
+    meanStdDev(reprojError.reshape(1,1), noArray(), simga_x);
+    simga_x *= sqrt(2.0*(double)reprojError.total()/(2.0*(double)reprojError.total() - 1.0));
+    double s = simga_x.at<double>(0);
+
+    Mat _JTJ_inv, _JTE;
+    computeJacobian(objectPoints, imagePoints, parameters, _JTJ_inv, _JTE);
+    sqrt(_JTJ_inv, _JTJ_inv);
+
+    errors = 3 * s * _JTJ_inv.diag();
+    
+    if(CALIB_FIX_SKEW)
+    {
+        errors.at<double>(6*n + 2) = 0;
+    }
+    rms = 0;
+    const Vec2d* ptr_ex = reprojError.ptr<Vec2d>();
+    for (size_t i = 0; i < reprojError.total(); i++)
+    {
+        rms += ptr_ex[i][0] * ptr_ex[i][0] + ptr_ex[i][1] * ptr_ex[i][1];
+    }
+
+    rms /= (double)reprojError.total();
+    rms = sqrt(rms);
 }
 
 //

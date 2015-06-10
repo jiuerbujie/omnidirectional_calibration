@@ -208,81 +208,100 @@ TEST_F(omnidirTest, jacobian)
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 }
 
-//TEST_F(omnidirTest, initial)
-//{
-//    // load pattern points and image points, you should assign your path of the corner file.
-//    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-//    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-//    cv::Size imgSize;
-//    fs["patternPoints"] >> v_patternPoints;
-//    fs["imagePoints"] >> v_imagePoints;
-//    fs["imageSize"] >> imgSize;
-//    for (int i = 0; i < (int)v_imagePoints.size(); i++)
-//    {
-//        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-//        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-//    }
-//    cv::Mat omAll, tAll, K;
-//    std::vector<double> D(4);
-//    D[0] = D[1] = D[2] = D[3] = 0;
-//    double xi;
-//    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
-//    int nPoints = 0;
-//    int nImg = v_patternPoints.size();
-//    std::vector<cv::Mat> projImgPoints;
-//    for (int i = 0; i < nImg; i++)
-//    {
-//        nPoints += (int)v_patternPoints[i].total();
-//        cv::Mat imgPointsi;
-//        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
-//        projImgPoints.push_back(imgPointsi);
-//    }
-//    double meanReprojError = cv::omnidir::internal::computeMeanReproerr(v_imagePoints, projImgPoints);
-//    //double rms = sqrt(reProjError/nPoints);
-//    //double meanReProjError = reProjError / nPoints;
-//    EXPECT_LT(meanReprojError, 20);
-//}
+TEST_F(omnidirTest, initial)
+{
+    // load pattern points and image points, you should assign your path of the corner file.
+    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+    cv::Size imgSize;
+    fs["patternPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
+    for (int i = 0; i < (int)v_imagePoints.size(); i++)
+    {
+        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+    }
+    cv::Mat omAll, tAll, K;
+    std::vector<double> D(4);
+    D[0] = D[1] = D[2] = D[3] = 0;
+    double xi;
+    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
+    int nPoints = 0;
+    int nImg = v_patternPoints.size();
+    std::vector<cv::Mat> projImgPoints;
+    for (int i = 0; i < nImg; i++)
+    {
+        nPoints += (int)v_patternPoints[i].total();
+        cv::Mat imgPointsi;
+        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
+        double proj = cv::omnidir::internal::computeMeanReproerr(v_imagePoints[i], imgPointsi);
+        projImgPoints.push_back(imgPointsi);
+    }
+    double meanReprojError = cv::omnidir::internal::computeMeanReproerr(v_imagePoints, projImgPoints);
 
-//TEST_F(omnidirTest, calibration)
-//{ 
-//    // load pattern points and image points, you should assign your path of the corner file.
-//    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-//    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-//    cv::Size imgSize;
-//    fs["patternPoints"] >> v_patternPoints;
-//    fs["imagePoints"] >> v_imagePoints;
-//    fs["imageSize"] >> imgSize;
-//
-//    std::vector<cv::Mat> pattern_input, image_input;
-//    for (int i = 0; i < 1; i++)
-//    {
-//        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-//        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-//        pattern_input.push_back(v_patternPoints[i]);
-//        image_input.push_back(v_imagePoints[i]);
-//    }
-//    cv::Mat K, D, omAll, tAll;
-//    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.01);
-//    double xi ;
-//    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, critia);
-//    EXPECT_LT(rms, 1);
-//}
+    EXPECT_LT(meanReprojError, 15);
+}
+
+TEST_F(omnidirTest, calibration)
+{ 
+    // load pattern points and image points, you should assign your path of the corner file.
+    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+    cv::Size imgSize;
+    fs["patternPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
+
+    std::vector<cv::Mat> pattern_input, image_input;
+    for (int i = 0; i < (int)v_patternPoints.size(); i++)
+    {
+        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+        pattern_input.push_back(v_patternPoints[i]);
+        image_input.push_back(v_imagePoints[i]);
+    }
+    cv::Mat K, D, omAll, tAll;
+    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 50, 0.0001);
+    double xi ;
+    int flag = cv::omnidir::CALIB_FIX_SKEW;
+    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
+    EXPECT_LT(rms, 2);
+}
+
+TEST_F(omnidirTest, undistort)
+{
+    // load image, temporarily please specify your own image 
+    cv::Mat imgDis = cv::imread("1.bmp", cv::IMREAD_GRAYSCALE);
+    cv::Mat _K = cv::Mat(this->K), _D = cv::Mat(this->D);
+    double xi = this->xi;
+
+    cv::Mat undistorted;
+    double scale = 0.3;
+    cv::Matx33d KNew = cv::Matx33d(this->K(0,0)*scale, this->K(0,1), this->K(0,2),
+                                    0, this->K(1,1)*scale, this->K(1,2),
+                                    0,  0,  1);
+    cv::omnidir::undistortImage(imgDis, undistorted, _K, _D, xi, KNew);
+
+    cv::imwrite("1_undis.bmp", undistorted);
+
+}
 
 const cv::Size omnidirTest::imageSize(1280, 800);
 
-const cv::Matx33d omnidirTest::K(384.8114878905080,               0, 631.9609941699916,
-                                 0, 386.6814375399752, 432.6685449908914,
+const cv::Matx33d omnidirTest::K(408.9113574019831, 0, 630.2804046001243,
+                                 0, 410.4878218607378, 431.9173219995887,
                                  0,               0,                1);
 
-const cv::Vec4d omnidirTest::D(-0.0014613319981768, -0.00329861110580401, 0.00605760088590183, -0.00374209380722371);
+const cv::Vec4d omnidirTest::D(-0.008287863437777166, 0.01177892568193207, 0.02282460697780795, -0.004184916118489851);
 
 const cv::Vec3d omnidirTest::om(0.0001, -0.02, 0.02);
 
 const cv::Vec3d omnidirTest::T(-9.9217369356044638e-02, 3.1741831972356663e-03, 1.8551007952921010e-04);
 
-const double omnidirTest::s = 0.01;
+const double omnidirTest::s = 0;
 
-const double omnidirTest::xi = 0.936087907397598;
+const double omnidirTest::xi = 1.05343;
 
 std::string omnidirTest::combine(const std::string& _item1, const std::string& _item2)
 {

@@ -46,6 +46,15 @@ namespace cv
 {
 namespace omnidir
 {
+    enum {
+        CALIB_FIX_SKEW              = 1,
+        CALIB_FIX_K1                = 2,
+        CALIB_FIX_K2                = 4,
+        CALIB_FIX_P1                = 8,
+        CALIB_FIX_P2                = 16
+    };
+
+
 /**
  * This module was accepted as a GSoC 2015 project for OpenCV, authored by
  * Baisheng Lai, mentored by Bo Li.
@@ -194,7 +203,7 @@ namespace internal
     void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE);
     void encodeParameters(InputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, InputArray distoaration, double xi, int n, OutputArray parameters);
     void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distoration, double& xi);
-    void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Vec2d& std_error, double& rms);
+    void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
 } // internal
 
