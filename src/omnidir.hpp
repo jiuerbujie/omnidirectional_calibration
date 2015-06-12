@@ -51,7 +51,8 @@ namespace omnidir
         CALIB_FIX_K1                = 2,
         CALIB_FIX_K2                = 4,
         CALIB_FIX_P1                = 8,
-        CALIB_FIX_P2                = 16
+        CALIB_FIX_P2                = 16,
+        CALIB_FIX_XI                = 32
     };
 
 
@@ -197,6 +198,7 @@ namespace omnidir
     CV_EXPORTS_W void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
         InputArray R, InputArray tvec, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2, OutputArray Q, int flags,
         const Size& newImageSize);
+
 namespace internal
 {
     void initializeCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
@@ -205,6 +207,7 @@ namespace internal
     void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distoration, double& xi);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
+    void checkFixed(Mat &G, int flags, int n);
 } // internal
 
     

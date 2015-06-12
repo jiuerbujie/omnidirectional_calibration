@@ -262,10 +262,11 @@ TEST_F(omnidirTest, calibration)
         image_input.push_back(v_imagePoints[i]);
     }
     cv::Mat K, D, omAll, tAll;
-    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 50, 0.0001);
+    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
     double xi ;
     int flag = cv::omnidir::CALIB_FIX_SKEW;
     double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
+
     EXPECT_LT(rms, 2);
 }
 

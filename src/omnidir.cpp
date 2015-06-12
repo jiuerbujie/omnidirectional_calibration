@@ -437,7 +437,6 @@ void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
 {
     Size size = new_size.area() != 0 ? new_size : distorted.size();
 
-
     cv::Mat map1, map2;
     omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
     cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
@@ -601,7 +600,7 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
         Mat _projected;
         cv::omnidir::projectPoints(patternPoints.getMat(i), _projected, v_omAll[i], v_tAll[i], _K, Matx14d(0, 0, 0, 0), 1, cv::noArray());
         double _error = omnidir::internal::computeMeanReproerr(imagePoints.getMat(i), _projected);
-        if(_error < 50)
+        if(_error < 20)
         {
             reProjErrorFilter.push_back(_error);
             omFilter.push_back(v_omAll[i]);
@@ -698,7 +697,6 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
    
     // initialization
     cv::omnidir::internal::initializeCalibration(patternPoints, imagePoints, size, omAll, tAll, K, xi);
-    //double repr = 
     int n = (int)patternPoints.total();
     Mat finalParam(1, 10 + 6*n, CV_64F);
     Mat currentParam(1, 10 + 6*n, CV_64F);
@@ -721,11 +719,8 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
 
         // Gauss¨CNewton
         Mat G = alpha_smooth2*JTJ_inv * JTError;
-
-        if (flags == CALIB_FIX_SKEW)
-        {
-            G.at<double>(n*6 + 2) = 0;
-        }
+        
+        internal::checkFixed(G, flags, n);
 
         finalParam = currentParam + G.t();
 
@@ -748,9 +743,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     Vec2d std_error;
     double rms;
     Mat errors;
-
     cv::omnidir::internal::estimateUncertainties(patternPoints, imagePoints, finalParam, errors, std_error, rms, flags);
-
     return rms;
 }
 
@@ -902,4 +895,38 @@ double cv::omnidir::internal::computeMeanReproerr(InputArrayOfArrays imagePoints
     }
     double meanReprojError = reprojError / totalPoints;
     return meanReprojError;
+}
+
+void cv::omnidir::internal::checkFixed(Mat& G, int flags, int n)
+{
+    int _flags = flags;
+    if(_flags >= omnidir::CALIB_FIX_XI)
+    {
+        G.at<double>(6*n + 5) = 0;
+        _flags -= omnidir::CALIB_FIX_XI;
+    }
+    if(_flags >= omnidir::CALIB_FIX_P2)
+    {
+        G.at<double>(6*n + 9) = 0;
+        _flags -= omnidir::CALIB_FIX_P2;
+    }
+    if(_flags >= omnidir::CALIB_FIX_P1)
+    {
+        G.at<double>(6*n + 8) = 0;
+        _flags -= omnidir::CALIB_FIX_P1;
+    }
+    if(_flags >= omnidir::CALIB_FIX_K2)
+    {
+        G.at<double>(6*n + 7) = 0;
+        _flags -= omnidir::CALIB_FIX_K2;
+    }
+    if(_flags >= omnidir::CALIB_FIX_K1)
+    {
+        G.at<double>(6*n + 6) = 0;
+        _flags -= omnidir::CALIB_FIX_K1;
+    }
+    if(_flags == omnidir::CALIB_FIX_SKEW)
+    {
+        G.at<double>(6*n + 2) = 0;
+    }
 }
