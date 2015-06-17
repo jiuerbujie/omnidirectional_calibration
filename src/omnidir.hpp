@@ -147,7 +147,7 @@ namespace omnidir
     @param D Output distortion parameters \f$(k_1, k_2, p_1, p_2)\f$
     @param omAll Output rotations for each calibration images
     @param tAll Output translation for each calibration images
-    @param flags The flags of some features that will added
+    @param flags The flags that control calibrate
     @param criteria Termination criteria for optimization
     */
     CV_EXPORTS_W double calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size,
@@ -169,7 +169,7 @@ namespace omnidir
     @param D2 Output distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the second camera
     @param R Output rotation between the first and second camera
     @param T Output translation between the first and second camera
-    @param flags The flags of some features that will added
+    @param flags The flags that control stereoCalibrate
     @param criteria Termination criteria for optimization
     @
     */
@@ -195,7 +195,8 @@ namespace omnidir
     @param P2 Output 3x4 projection matrix in the rectified coordinate systems for the second
     camera.
     @param Q Output 4x4 disparity-to-depth mapping matrix
-    @param newImageSize New image size of rectified images. When it is (0,0), the new image size is
+    @param flags The flags that control stereoRectify
+    @param newImageSize New image size of rectified images. When it is (0,0), the new image size is 
     equivalent to imageSize
     */
     CV_EXPORTS_W void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
