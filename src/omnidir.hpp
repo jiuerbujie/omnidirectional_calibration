@@ -47,12 +47,15 @@ namespace cv
 namespace omnidir
 {
     enum {
-        CALIB_FIX_SKEW              = 1,
-        CALIB_FIX_K1                = 2,
-        CALIB_FIX_K2                = 4,
-        CALIB_FIX_P1                = 8,
-        CALIB_FIX_P2                = 16,
-        CALIB_FIX_XI                = 32
+        CALIB_USE_GUESS             = 1,
+        CALIB_FIX_SKEW              = 2,
+        CALIB_FIX_K1                = 4,
+        CALIB_FIX_K2                = 8,
+        CALIB_FIX_P1                = 16,
+        CALIB_FIX_P2                = 32,
+        CALIB_FIX_XI                = 64,
+        CALIB_FIX_GAMMA             = 128,
+        CALIB_FIX_CENTER            = 256
     };
 
 
@@ -63,7 +66,7 @@ namespace omnidir
 
     /** @brief Projects points for omnidirectional camera using CMei's model
 
-    @param objectPoints Object points in world coordiante, 1xN/Nx1 3-channel of type CV_64F and N 
+    @param objectPoints Object points in world coordiante, 1xN/Nx1 3-channel of type CV_64F and N
     is the number of points.
     @param imagePoints Output array of image points, 1xN/Nx1 2-channel of type CV_64F
     @param rvec vector of rotation between world coordinate and camera coordinate, i.e., om
@@ -71,21 +74,21 @@ namespace omnidir
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$.
     @param D Input vector of distortion coefficients \f$(k_1, k_2, p_1, p_2)\f$.
     @param xi The parameter xi for CMei's model
-    @param jacobian Optional output 2Nx16 of type CV_64F jacobian matrix, constains the derivatives of 
+    @param jacobian Optional output 2Nx16 of type CV_64F jacobian matrix, constains the derivatives of
     image pixel points wrt parametes including \f$om, T, f_x, f_y, s, c_x, c_y, xi, k_1, k_2, p_1, p_2\f$.
     This matrix will be used in calibration by optimization.
 
-    The function projects object 3D points of world coordiante to image pixels, parametered by intrinsic 
-    and extrinsic parameters. Also, it optionaly compute a by-product: the jacobian matrix containing 
+    The function projects object 3D points of world coordiante to image pixels, parametered by intrinsic
+    and extrinsic parameters. Also, it optionaly compute a by-product: the jacobian matrix containing
     onstains the derivatives of image pixel points wrt intrinsic and extrinsic parametes.
      */
-    CV_EXPORTS_W void projectPoints(InputArray objectPoints, OutputArray imagePoints, InputArray rvec, InputArray tvec, 
-                       InputArray K, InputArray D, double xi,OutputArray jacobian = noArray());
+    CV_EXPORTS_W void projectPoints(InputArray objectPoints, OutputArray imagePoints, InputArray rvec, InputArray tvec,
+                       InputArray K, double xi, InputArray D, OutputArray jacobian = noArray());
 
     /** @brief Undistort 2D image points for omnidirectional camera using CMei's model
 
-    @param Array of distorted image points, 1xN/Nx1 2-channel of tyep CV_64F 
-    
+    @param Array of distorted image points, 1xN/Nx1 2-channel of tyep CV_64F
+
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$.
     @param D Distortion coefficients \f$(k_1, k_2, p_1, p_2)\f$.
     @param xi The parameter xi for CMei's model
@@ -94,7 +97,7 @@ namespace omnidir
     @param undistorted array of normalized object points, 1xN/Nx1 2-channel of type CV_64F
      */
     CV_EXPORTS_W void undistortPoints(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray R);
-    
+
     /** @brief Distorts 2D object points to image points, similar to projectPoints
 
     @param undistorted Array of undistorted object points, 1xN/Nx1 2-channel with type CV_64F
@@ -105,7 +108,7 @@ namespace omnidir
      */
     CV_EXPORTS_W void distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi);
 
-    /** @brief Computes undistortion and rectification maps for omnidirectional camera image transform by cv::remap(). 
+    /** @brief Computes undistortion and rectification maps for omnidirectional camera image transform by cv::remap().
     If D is empty zero distortion is used, if R or P is empty identity matrixes are used.
 
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$.
@@ -120,18 +123,18 @@ namespace omnidir
      */
     CV_EXPORTS_W void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, const cv::Size& size,
         int mltype, OutputArray map1, OutputArray map2);
-    
+
     /** @brief Undistort omnidirectional images to perspective images
 
     @param distorted omnidirectional image with very large distortion
-    @param undistorted The output undistorted image 
+    @param undistorted The output undistorted image
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$.
     @param D Input vector of distortion coefficients \f$(k_1, k_2, p_1, p_2)\f$.
     @param xi The parameter xi for CMei's model
     @param Knew Camera matrix of the distorted image. By default, it is just K.
     @param new_size The new image size. By default, it is the size of distorted.
     */
-    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, 
+    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi,
         InputArray Knew = cv::noArray(), const Size& new_size = Size());
 
         /** @brief Perform omnidirectional camera calibration
@@ -147,13 +150,13 @@ namespace omnidir
     @param flags The flags of some features that will added
     @param criteria Termination criteria for optimization
     */
-    CV_EXPORTS_W double calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size, 
-        InputOutputArray K, double& xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
+    CV_EXPORTS_W double calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size,
+        InputOutputArray K, InputOutputArray xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
         int flags, TermCriteria criteria);
 
-    /** @brief Stereo calibration for omnidirectional camera model. It computes the intrinsic parameters for two 
+    /** @brief Stereo calibration for omnidirectional camera model. It computes the intrinsic parameters for two
     cameras and the extrinsic parameters between two cameras
-    
+
     @param objectPoints Vector of vector of pattern points in world (pattern) coordiante, 1xN/Nx1 3-channel
     @param imagePoints1 Vector of vector of correspoinding image points of the first camera
     @param imagePoints2 Vector of vector of correspoinding image points of the second camera
@@ -170,12 +173,12 @@ namespace omnidir
     @param criteria Termination criteria for optimization
     @
     */
-    CV_EXPORTS_W double stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, 
-        Size imageSize, InputOutputArray K1, double& xi1, InputOutputArray D1, InputOutputArray K2, double& xi2, 
+    CV_EXPORTS_W double stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2,
+        Size imageSize, InputOutputArray K1, double& xi1, InputOutputArray D1, InputOutputArray K2, double& xi2,
         InputOutputArray D2, OutputArray R, OutputArray T, int flags, TermCriteria criteria);
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
-    
+
     @param K1 Input camera matrix of the first camera
     @param D1 Input distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the first camera
     @param xi1 Input parameter xi for the first camera for CMei's model
@@ -192,7 +195,7 @@ namespace omnidir
     @param P2 Output 3x4 projection matrix in the rectified coordinate systems for the second
     camera.
     @param Q Output 4x4 disparity-to-depth mapping matrix
-    @param newImageSize New image size of rectified images. When it is (0,0), the new image size is 
+    @param newImageSize New image size of rectified images. When it is (0,0), the new image size is
     equivalent to imageSize
     */
     CV_EXPORTS_W void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
@@ -202,15 +205,18 @@ namespace omnidir
 namespace internal
 {
     void initializeCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
-    void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE);
+    void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
     void encodeParameters(InputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, InputArray distoaration, double xi, int n, OutputArray parameters);
     void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distoration, double& xi);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
     void checkFixed(Mat &G, int flags, int n);
+    void subMatrix(const Mat& src, Mat& dst, const std::vector<int>& cols, const std::vector<int>& rows);
+    void flags2idx(int flags, std::vector<int>& idx, int n);
+    void fillFixed(Mat&G, int flags, int n);
 } // internal
 
-    
+
 } // omnidir
 
 } //cv

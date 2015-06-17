@@ -98,7 +98,7 @@ TEST_F(omnidirTest, projectPoints)
     }
     cv::omnidir::distortPoints(undist1, distorted1, this->K, this->D, xi);
     cv::Vec2d dis1 =(cv::Vec2d)*distorted1.ptr<cv::Vec2d>();
-    cv::omnidir::projectPoints(undist2, distorted2, cv::Vec3d::all(0), cv::Vec3d::all(0), this->K, this->D, xi, cv::noArray());
+    cv::omnidir::projectPoints(undist2, distorted2, cv::Vec3d::all(0), cv::Vec3d::all(0), this->K, xi, this->D, cv::noArray());
 
     EXPECT_LT(cv::norm(distorted0-distorted1), 1e-9);
     EXPECT_LT(cv::norm(distorted0-distorted2), 1e-9);
@@ -133,23 +133,23 @@ TEST_F(omnidirTest, jacobian)
     r.fill(D, cv::RNG::NORMAL, 0, 1);
     D*= 0.5;
 
-    xi = abs(r.gaussian(1));
+    xi = std::abs(r.gaussian(1));
     s = 0.001 * r.gaussian(1);
 
     cv::Mat x1, x2, xpred;
     cv::Matx33d K(f.at<double>(0), s, c.at<double>(0),
                        0,       f.at<double>(1), c.at<double>(1),
                        0,                 0,           1);
-    
+
     cv::Mat jacobians;
-    cv::omnidir::projectPoints(X, x1, om, T, K, D, xi, jacobians);
+    cv::omnidir::projectPoints(X, x1, om, T, K, xi, D, jacobians);
 
     // Test on T:
     cv::Mat dT(3, 1, CV_64FC1);
     r.fill(dT, cv::RNG::NORMAL, 0, 1);
     dT *= 1e-9*cv::norm(T);
     cv::Mat T2 = T + dT;
-    cv::omnidir::projectPoints(X, x2, om, T2, K, D, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T2, K, xi, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(3,6) * dT).reshape(2,1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
@@ -158,7 +158,7 @@ TEST_F(omnidirTest, jacobian)
     r.fill(dom, cv::RNG::NORMAL, 0, 1);
     dom *= 1e-9*cv::norm(om);
     cv::Mat om2 = om + dom;
-    cv::omnidir::projectPoints(X, x2, om2, T, K, D, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om2, T, K, xi, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(0,3) * dom).reshape(2,1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
@@ -167,17 +167,17 @@ TEST_F(omnidirTest, jacobian)
     r.fill(df, cv::RNG::NORMAL, 0, 1);
     df *= 1e-9 * cv::norm(f);
     cv::Matx33d K2 = K + cv::Matx33d(df.at<double>(0), 0, 0, 0, df.at<double>(1), 0, 0, 0, 1);
-    cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T, K2, xi, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(6,8)* df).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
     // Test on s
     double ds = r.gaussian(1);
-    ds *= 1e-9 * abs(s);
+    ds *= 1e-9 * std::abs(s);
     double s2 = s + ds;
     K2 = K;
     K2(0,1) = s2;
-    cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T, K2, xi, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(8,9)*ds).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
@@ -186,15 +186,15 @@ TEST_F(omnidirTest, jacobian)
     r.fill(dc, cv::RNG::NORMAL, 0, 1);
     dc *= 1e-9 * cv::norm(c);
     K2 = K + cv::Matx33d(0, 0, dc.at<double>(0), 0, 0, dc.at<double>(1), 0, 0, 1);
-    cv::omnidir::projectPoints(X, x2, om, T, K2, D, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T, K2, xi, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(9,11)*dc).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
     // Test on xi
     double dxi = r.gaussian(1);
-    dxi *= 1e-9 * abs(xi);
+    dxi *= 1e-9 * std::abs(xi);
     double xi2 = xi + dxi;
-    cv::omnidir::projectPoints(X, x2, om, T, K, D, xi2, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T, K, xi2, D, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(11,12)*dxi).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 
@@ -203,7 +203,7 @@ TEST_F(omnidirTest, jacobian)
     r.fill(dD, cv::RNG::NORMAL, 0, 1);
     dD *= 1e-9 * cv::norm(D);
     cv::Mat D2 = D + dD;
-    cv::omnidir::projectPoints(X, x2, om, T, K, D2, xi, cv::noArray());
+    cv::omnidir::projectPoints(X, x2, om, T, K, xi, D2, cv::noArray());
     xpred = x1 + cv::Mat(jacobians.colRange(12,16)*dD).reshape(2, 1);
     CV_Assert(cv::norm(x2 - xpred) < 1e-10);
 }
@@ -234,7 +234,7 @@ TEST_F(omnidirTest, initial)
     {
         nPoints += (int)v_patternPoints[i].total();
         cv::Mat imgPointsi;
-        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, D, 1, cv::noArray());
+        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, 1, D, cv::noArray());
         double proj = cv::omnidir::internal::computeMeanReproerr(v_imagePoints[i], imgPointsi);
         projImgPoints.push_back(imgPointsi);
     }
@@ -244,9 +244,9 @@ TEST_F(omnidirTest, initial)
 }
 
 TEST_F(omnidirTest, calibration)
-{ 
+{
     // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+    cv::FileStorage fs("corners_sim.xml", cv::FileStorage::READ);
     std::vector<cv::Mat> v_patternPoints, v_imagePoints;
     cv::Size imgSize;
     fs["patternPoints"] >> v_patternPoints;
@@ -263,7 +263,7 @@ TEST_F(omnidirTest, calibration)
     }
     cv::Mat K, D, omAll, tAll;
     cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
-    double xi ;
+    cv::Vec<double, 1> xi ;
     int flag = cv::omnidir::CALIB_FIX_SKEW;
     double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
 
@@ -272,7 +272,7 @@ TEST_F(omnidirTest, calibration)
 
 TEST_F(omnidirTest, undistort)
 {
-    // load image, temporarily please specify your own image 
+    // load image, temporarily please specify your own image
     cv::Mat imgDis = cv::imread("1.bmp", cv::IMREAD_GRAYSCALE);
     cv::Mat _K = cv::Mat(this->K), _D = cv::Mat(this->D);
     double xi = this->xi;
