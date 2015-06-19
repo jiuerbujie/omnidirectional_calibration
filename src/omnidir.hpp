@@ -58,7 +58,11 @@ namespace omnidir
         CALIB_FIX_CENTER            = 256
     };
 
-
+    enum{
+        RECTIFY_PERSPECTIVE         = 1,
+        RECTIFY_CYLINDRICAL         = 2,
+        RECTIFY_LONGLATI            = 3
+    };
 /**
  * This module was accepted as a GSoC 2015 project for OpenCV, authored by
  * Baisheng Lai, mentored by Bo Li.
@@ -106,7 +110,7 @@ namespace omnidir
     @param xi The parameter xi for CMei's model
     @param distorted Array of distorted image points of tyep CV_64F
      */
-    CV_EXPORTS_W void distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi);
+    //CV_EXPORTS_W void distortPoints(InputArray undistorted, OutputArray distorted, InputArray K, InputArray D, double xi);
 
     /** @brief Computes undistortion and rectification maps for omnidirectional camera image transform by cv::remap().
     If D is empty zero distortion is used, if R or P is empty identity matrixes are used.
@@ -122,7 +126,7 @@ namespace omnidir
     @param map2 The second output map.
      */
     CV_EXPORTS_W void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, const cv::Size& size,
-        int mltype, OutputArray map1, OutputArray map2);
+        int mltype, OutputArray map1, OutputArray map2, int flags);
 
     /** @brief Undistort omnidirectional images to perspective images
 
@@ -134,7 +138,7 @@ namespace omnidir
     @param Knew Camera matrix of the distorted image. By default, it is just K.
     @param new_size The new image size. By default, it is the size of distorted.
     */
-    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi,
+    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, int flags,
         InputArray Knew = cv::noArray(), const Size& new_size = Size());
 
         /** @brief Perform omnidirectional camera calibration

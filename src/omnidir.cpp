@@ -286,7 +286,7 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
 /////////////////////////////////////////////////////////////////////////////
 //////// cv::omnidir::initUndistortRectifyMap
 void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P,
-    const cv::Size& size, int m1type, OutputArray map1, OutputArray map2)
+    const cv::Size& size, int m1type, OutputArray map1, OutputArray map2, int flags)
 {
     CV_Assert( m1type == CV_16SC2 || m1type == CV_32F || m1type <=0 );
     map1.create( size, m1type <= 0 ? CV_16SC2 : m1type );
@@ -337,50 +337,109 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
     else
         PP = K.getMat();
 
-    cv::Matx33d iR = (PP*RR).inv(cv::DECOMP_SVD);
+    cv::Matx33d iKR = (PP*RR).inv(cv::DECOMP_SVD);
+    cv::Matx33d iK = PP.inv(cv::DECOMP_SVD);
+    cv::Matx33d iR = RR.inv(cv::DECOMP_SVD);
 
-    // so far it is undistorted to perspective image
-    for (int i = 0; i < size.height; ++i)
+    if (flags == omnidir::RECTIFY_PERSPECTIVE)
     {
-        float* m1f = map1.getMat().ptr<float>(i);
-        float* m2f = map2.getMat().ptr<float>(i);
-        short*  m1 = (short*)m1f;
-        ushort* m2 = (ushort*)m2f;
-
-        double _x = i*iR(0, 1) + iR(0, 2),
-               _y = i*iR(1, 1) + iR(1, 2),
-               _w = i*iR(2, 1) + iR(2, 2);
-        for(int j = 0; j < size.width; ++j, _x+=iR(0,0), _y+=iR(1,0), _w+=iR(2,0))
+        // so far it is undistorted to perspective image
+        for (int i = 0; i < size.height; ++i)
         {
-            // project back to unit sphere
-            double r = sqrt(_x*_x + _y*_y + _w*_w);
-            double Xs = _x / r;
-            double Ys = _y / r;
-            double Zs = _w / r;
-            // project to image plane
-            double xu = Xs / (Zs + xi),
-                   yu = Ys / (Zs + xi);
-            // add distortion
-            double r2 = xu*xu + yu*yu;
-            double r4 = r2*r2;
-            double xd = (1+k[0]*r2+k[1]*r4)*xu + 2*p[0]*xu*yu + p[1]*(r2+2*xu*xu);
-            double yd = (1+k[0]*r2+k[1]*r4)*yu + p[0]*(r2+2*yu*yu) + 2*p[1]*xu*yu;
-            // to image pixel
-            double u = f[0]*xd + s*yd + c[0];
-            double v = f[1]*yd + c[1];
+            float* m1f = map1.getMat().ptr<float>(i);
+            float* m2f = map2.getMat().ptr<float>(i);
+            short*  m1 = (short*)m1f;
+            ushort* m2 = (ushort*)m2f;
 
-            if( m1type == CV_16SC2 )
+            double _x = i*iKR(0, 1) + iKR(0, 2),
+                   _y = i*iKR(1, 1) + iKR(1, 2),
+                   _w = i*iKR(2, 1) + iKR(2, 2);
+            for(int j = 0; j < size.width; ++j, _x+=iKR(0,0), _y+=iKR(1,0), _w+=iKR(2,0))
             {
-                int iu = cv::saturate_cast<int>(u*cv::INTER_TAB_SIZE);
-                int iv = cv::saturate_cast<int>(v*cv::INTER_TAB_SIZE);
-                m1[j*2+0] = (short)(iu >> cv::INTER_BITS);
-                m1[j*2+1] = (short)(iv >> cv::INTER_BITS);
-                m2[j] = (ushort)((iv & (cv::INTER_TAB_SIZE-1))*cv::INTER_TAB_SIZE + (iu & (cv::INTER_TAB_SIZE-1)));
+                // project back to unit sphere
+                double r = sqrt(_x*_x + _y*_y + _w*_w);
+                double Xs = _x / r;
+                double Ys = _y / r;
+                double Zs = _w / r;
+                // project to image plane
+                double xu = Xs / (Zs + xi),
+                    yu = Ys / (Zs + xi);
+                // add distortion
+                double r2 = xu*xu + yu*yu;
+                double r4 = r2*r2;
+                double xd = (1+k[0]*r2+k[1]*r4)*xu + 2*p[0]*xu*yu + p[1]*(r2+2*xu*xu);
+                double yd = (1+k[0]*r2+k[1]*r4)*yu + p[0]*(r2+2*yu*yu) + 2*p[1]*xu*yu;
+                // to image pixel
+                double u = f[0]*xd + s*yd + c[0];
+                double v = f[1]*yd + c[1];
+
+                if( m1type == CV_16SC2 )
+                {
+                    int iu = cv::saturate_cast<int>(u*cv::INTER_TAB_SIZE);
+                    int iv = cv::saturate_cast<int>(v*cv::INTER_TAB_SIZE);
+                    m1[j*2+0] = (short)(iu >> cv::INTER_BITS);
+                    m1[j*2+1] = (short)(iv >> cv::INTER_BITS);
+                    m2[j] = (ushort)((iv & (cv::INTER_TAB_SIZE-1))*cv::INTER_TAB_SIZE + (iu & (cv::INTER_TAB_SIZE-1)));
+                }
+                else if( m1type == CV_32FC1 )
+                {
+                    m1f[j] = (float)u;
+                    m2f[j] = (float)v;
+                }
             }
-            else if( m1type == CV_32FC1 )
+        }
+    }
+    else if(flags == omnidir::RECTIFY_CYLINDRICAL)
+    {
+        for (int i = 0; i < size.height; ++i)
+        {
+            float* m1f = map1.getMat().ptr<float>(i);
+            float* m2f = map2.getMat().ptr<float>(i);
+            short*  m1 = (short*)m1f;
+            ushort* m2 = (ushort*)m2f;
+
+            double theta = i*iK(0, 1) + iK(0, 2),
+                   h     = i*iK(1, 1) + iK(1, 2);
+
+            for (int j = 0; j < size.width; ++j, theta+=iK(0,0), h+=iK(1,0))
             {
-                m1f[j] = (float)u;
-                m2f[j] = (float)v;
+                double _xt = std::sin(theta);
+                double _yt = h;
+                double _wt = std::cos(theta);
+
+                double _x = iR(0,0)*_xt + iR(0,1)*_yt + iR(0,2)*_wt;
+                double _y = iR(1,0)*_xt + iR(1,1)*_yt + iR(1,2)*_wt;
+                double _w = iR(2,0)*_xt + iR(2,1)*_yt + iR(2,2)*_wt;
+
+                double r = sqrt(_x*_x + _y*_y + _w*_w);
+                double Xs = _x / r;
+                double Ys = _y / r;
+                double Zs = _w / r;
+                // project to image plane
+                double xu = Xs / (Zs + xi),
+                    yu = Ys / (Zs + xi);
+                // add distortion
+                double r2 = xu*xu + yu*yu;
+                double r4 = r2*r2;
+                double xd = (1+k[0]*r2+k[1]*r4)*xu + 2*p[0]*xu*yu + p[1]*(r2+2*xu*xu);
+                double yd = (1+k[0]*r2+k[1]*r4)*yu + p[0]*(r2+2*yu*yu) + 2*p[1]*xu*yu;
+                // to image pixel
+                double u = f[0]*xd + s*yd + c[0];
+                double v = f[1]*yd + c[1];
+
+                if( m1type == CV_16SC2 )
+                {
+                    int iu = cv::saturate_cast<int>(u*cv::INTER_TAB_SIZE);
+                    int iv = cv::saturate_cast<int>(v*cv::INTER_TAB_SIZE);
+                    m1[j*2+0] = (short)(iu >> cv::INTER_BITS);
+                    m1[j*2+1] = (short)(iv >> cv::INTER_BITS);
+                    m2[j] = (ushort)((iv & (cv::INTER_TAB_SIZE-1))*cv::INTER_TAB_SIZE + (iu & (cv::INTER_TAB_SIZE-1)));
+                }
+                else if( m1type == CV_32FC1 )
+                {
+                    m1f[j] = (float)u;
+                    m2f[j] = (float)v;
+                }
             }
         }
     }
@@ -390,12 +449,12 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
 /// cv::omnidir::undistortImage
 
 void cv::omnidir::undistortImage(InputArray distorted, OutputArray undistorted,
-    InputArray K, InputArray D, double xi, InputArray Knew, const Size& new_size)
+    InputArray K, InputArray D, double xi, int flags, InputArray Knew, const Size& new_size)
 {
     Size size = new_size.area() != 0 ? new_size : distorted.size();
 
     cv::Mat map1, map2;
-    omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2 );
+    omnidir::initUndistortRectifyMap(K, D, xi, cv::Matx33d::eye(), Knew, size, CV_16SC2, map1, map2, flags);
     cv::remap(distorted, undistorted, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
 }
 
