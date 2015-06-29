@@ -139,7 +139,7 @@ namespace omnidir
     @param new_size The new image size. By default, it is the size of distorted.
     */
     CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, int flags,
-        InputArray Knew = cv::noArray(), const Size& new_size = Size());
+        InputArray Knew = cv::noArray(), const Size& new_size = Size(), InputArray R = Matx33d::eye());
 
         /** @brief Perform omnidirectional camera calibration
 
@@ -156,7 +156,7 @@ namespace omnidir
     */
     CV_EXPORTS_W double calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size,
         InputOutputArray K, InputOutputArray xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
-        int flags, TermCriteria criteria);
+        int flags, TermCriteria criteria, OutputArray idx=noArray());
 
     /** @brief Stereo calibration for omnidirectional camera model. It computes the intrinsic parameters for two
     cameras and the extrinsic parameters between two cameras
@@ -177,8 +177,8 @@ namespace omnidir
     @param criteria Termination criteria for optimization
     @
     */
-    CV_EXPORTS_W double stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2,
-        Size imageSize, InputOutputArray K1, double& xi1, InputOutputArray D1, InputOutputArray K2, double& xi2,
+    CV_EXPORTS_W double stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
+        Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
         InputOutputArray D2, OutputArray R, OutputArray T, int flags, TermCriteria criteria);
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
@@ -209,16 +209,29 @@ namespace omnidir
 
 namespace internal
 {
-    void initializeCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray K, double& xi);
+    void initializeCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints, Size size, OutputArrayOfArrays omAll,
+        OutputArrayOfArrays tAll, OutputArray K, double& xi, OutputArray idx = noArray());
+    void initializeStereoCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
+        Size size, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, OutputArray K1, OutputArray D1, OutputArray K2, OutputArray D2,
+        double &xi1, double &xi2);
     void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
-    void encodeParameters(InputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, InputArray distoaration, double xi, int n, OutputArray parameters);
+    void computeJacobianStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, 
+        InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
+    void encodeParameters(InputArray K, InputArrayOfArrays omAll, InputArrayOfArrays tAll, InputArray distoaration, double xi, OutputArray parameters);
+    void encodeParametersStereo(InputArray K1, InputArray K2, InputArray om, InputArray T, InputArrayOfArrays omL, InputArrayOfArrays tL, 
+        InputArray D1, InputArray D2, double xi1, double xi2, OutputArray parameters);
     void decodeParameters(InputArray paramsters, OutputArray K, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll, OutputArray distoration, double& xi);
+    void decodeParametersStereo(InputArray parameters, OutputArray K1, OutputArray K2, OutputArray om, OutputArray T, OutputArrayOfArrays omL,
+        OutputArrayOfArrays tL, OutputArray D1, OutputArray D2, double& xi1, double& xi2);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
     void checkFixed(Mat &G, int flags, int n);
     void subMatrix(const Mat& src, Mat& dst, const std::vector<int>& cols, const std::vector<int>& rows);
     void flags2idx(int flags, std::vector<int>& idx, int n);
     void fillFixed(Mat&G, int flags, int n);
+    double findMedian(const Mat& row);
+    Vec3d findMedian3(InputArray mat);
+    void getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2);
 } // internal
 
 
