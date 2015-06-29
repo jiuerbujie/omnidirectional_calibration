@@ -225,6 +225,8 @@ namespace internal
         OutputArrayOfArrays tL, OutputArray D1, OutputArray D2, double& xi1, double& xi2);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
     double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
+    double computeMeanReproerr(InputArrayOfArrays objetPoints, InputArrayOfArrays imagePoints, InputArray K, InputArray D, double xi, InputArrayOfArrays omAll,
+        InputArrayOfArrays tAll);
     void checkFixed(Mat &G, int flags, int n);
     void subMatrix(const Mat& src, Mat& dst, const std::vector<int>& cols, const std::vector<int>& rows);
     void flags2idx(int flags, std::vector<int>& idx, int n);

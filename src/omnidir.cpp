@@ -1225,6 +1225,25 @@ double cv::omnidir::internal::computeMeanReproerr(InputArrayOfArrays imagePoints
     return meanReprojError;
 }
 
+double cv::omnidir::internal::computeMeanReproerr(InputArrayOfArrays objetPoints, InputArrayOfArrays imagePoints, InputArray K, InputArray D, double xi, InputArrayOfArrays omAll,
+    InputArrayOfArrays tAll)
+{
+    CV_Assert(objetPoints.total() == imagePoints.total());
+    CV_Assert(!objetPoints.empty() && objetPoints.type() == CV_64FC3);
+    CV_Assert(!imagePoints.empty() && imagePoints.type() == CV_64FC3);
+    std::vector<Mat> proImagePoints;
+    int n = (int)objetPoints.total();
+
+    for(int i = 0; i < n; ++i)
+    {
+        Mat imgPoint;
+        cv::omnidir::projectPoints(objetPoints.getMat(i), imgPoint, omAll.getMat(i), tAll.getMat(i), K.getMat(), xi, D.getMat(), noArray());
+        proImagePoints.push_back(imgPoint);
+    }
+
+    return internal::computeMeanReproerr(objetPoints, proImagePoints);
+}
+
 void cv::omnidir::internal::checkFixed(Mat& G, int flags, int n)
 {
     int _flags = flags;
