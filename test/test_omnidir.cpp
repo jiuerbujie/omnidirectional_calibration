@@ -202,83 +202,99 @@ TEST_F(omnidirTest, jacobian)
     EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 }
 
-TEST_F(omnidirTest, initial)
+//TEST_F(omnidirTest, initial)
+//{
+//    // load pattern points and image points, you should assign your path of the corner file.
+//    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
+//    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+//    cv::Size imgSize;
+//    fs["patternPoints"] >> v_patternPoints;
+//    fs["imagePoints"] >> v_imagePoints;
+//    fs["imageSize"] >> imgSize;
+//    for (int i = 0; i < (int)v_imagePoints.size(); i++)
+//    {
+//        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+//        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+//    }
+//    cv::Mat omAll, tAll, K;
+//    std::vector<double> D(4);
+//    D[0] = D[1] = D[2] = D[3] = 0;
+//    double xi;
+//    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
+//    int nPoints = 0;
+//    int nImg = v_patternPoints.size();
+//    std::vector<cv::Mat> projImgPoints;
+//    for (int i = 0; i < nImg; i++)
+//    {
+//        nPoints += (int)v_patternPoints[i].total();
+//        cv::Mat imgPointsi;
+//        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, 1, D, cv::noArray());
+//        double proj = cv::omnidir::internal::computeMeanReproErr(v_imagePoints[i], imgPointsi);
+//        projImgPoints.push_back(imgPointsi);
+//    }
+//    double meanReprojError = cv::omnidir::internal::computeMeanReproErr(v_imagePoints, projImgPoints);
+//
+//    EXPECT_LT(meanReprojError, 15);
+//}
+
+//TEST_F(omnidirTest, calibration)
+//{
+//    // load pattern points and image points, you should assign your path of the corner file.
+//    cv::FileStorage fs("corners_sim.xml", cv::FileStorage::READ);
+//    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+//    cv::Size imgSize;
+//    fs["objectPoints"] >> v_patternPoints;
+//    fs["imagePoints"] >> v_imagePoints;
+//    fs["imageSize"] >> imgSize;
+//
+//    std::vector<cv::Mat> pattern_input, image_input;
+//    for (int i = 0; i < (int)v_patternPoints.size(); i++)
+//    {
+//        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+//        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+//        pattern_input.push_back(v_patternPoints[i]);
+//        image_input.push_back(v_imagePoints[i]);
+//    }
+//    cv::Mat K, D, omAll, tAll;
+//    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
+//    cv::Vec<double, 1> xi ;
+//    int flag = cv::omnidir::CALIB_FIX_SKEW;
+//    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
+//
+//    EXPECT_LT(rms, 2);
+//}
+
+//TEST_F(omnidirTest, undistort)
+//{
+//    // load image, temporarily please specify your own image
+//    cv::Mat imgDis = cv::imread("1.bmp", cv::IMREAD_GRAYSCALE);
+//    cv::Mat _K = cv::Mat(this->K), _D = cv::Mat(this->D);
+//    double xi = this->xi;
+//
+//    cv::Mat undistorted;
+//    double scale = 0.3;
+//    cv::Matx33d KNew = cv::Matx33d(this->K(0,0)*scale, this->K(0,1), this->K(0,2),
+//                                    0, this->K(1,1)*scale, this->K(1,2),
+//                                    0,  0,  1);
+//    cv::omnidir::undistortImage(imgDis, undistorted, _K, _D, xi, cv::omnidir::RECTIFY_PERSPECTIVE, KNew);
+//
+//    cv::imwrite("1_undis.bmp", undistorted);
+//}
+
+TEST_F(omnidirTest, calibrateStereo)
 {
-    // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners.xml", cv::FileStorage::READ);
-    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-    cv::Size imgSize;
-    fs["patternPoints"] >> v_patternPoints;
-    fs["imagePoints"] >> v_imagePoints;
-    fs["imageSize"] >> imgSize;
-    for (int i = 0; i < (int)v_imagePoints.size(); i++)
-    {
-        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-    }
-    cv::Mat omAll, tAll, K;
-    std::vector<double> D(4);
-    D[0] = D[1] = D[2] = D[3] = 0;
-    double xi;
-    cv::omnidir::internal::initializeCalibration(v_patternPoints, v_imagePoints, imgSize, omAll, tAll, K, xi);
-    int nPoints = 0;
-    int nImg = v_patternPoints.size();
-    std::vector<cv::Mat> projImgPoints;
-    for (int i = 0; i < nImg; i++)
-    {
-        nPoints += (int)v_patternPoints[i].total();
-        cv::Mat imgPointsi;
-        cv::omnidir::projectPoints(v_patternPoints[i], imgPointsi, omAll.at<cv::Vec3d>(i), tAll.at<cv::Vec3d>(i), K, 1, D, cv::noArray());
-        double proj = cv::omnidir::internal::computeMeanReproerr(v_imagePoints[i], imgPointsi);
-        projImgPoints.push_back(imgPointsi);
-    }
-    double meanReprojError = cv::omnidir::internal::computeMeanReproerr(v_imagePoints, projImgPoints);
-
-    EXPECT_LT(meanReprojError, 15);
-}
-
-TEST_F(omnidirTest, calibration)
-{
-    // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners_sim.xml", cv::FileStorage::READ);
-    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-    cv::Size imgSize;
-    fs["patternPoints"] >> v_patternPoints;
-    fs["imagePoints"] >> v_imagePoints;
-    fs["imageSize"] >> imgSize;
-
-    std::vector<cv::Mat> pattern_input, image_input;
-    for (int i = 0; i < (int)v_patternPoints.size(); i++)
-    {
-        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-        pattern_input.push_back(v_patternPoints[i]);
-        image_input.push_back(v_imagePoints[i]);
-    }
-    cv::Mat K, D, omAll, tAll;
+    cv::FileStorage fs("fisheye_pair.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_object, v_image1, v_image2;
+    cv::Size imageSize;
+    fs["imagePoints1"] >> v_image1;
+    fs["imagePoints2"] >> v_image2;
+    fs["objectPoints"] >> v_object;
+    fs["imageSize"] >> imageSize;
+    cv::Mat K1, K2, D1, D2, xi1, xi2;
+    cv::Vec3d R, T;
     cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
-    cv::Vec<double, 1> xi ;
-    int flag = cv::omnidir::CALIB_FIX_SKEW;
-    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
-
-    EXPECT_LT(rms, 2);
-}
-
-TEST_F(omnidirTest, undistort)
-{
-    // load image, temporarily please specify your own image
-    cv::Mat imgDis = cv::imread("1.bmp", cv::IMREAD_GRAYSCALE);
-    cv::Mat _K = cv::Mat(this->K), _D = cv::Mat(this->D);
-    double xi = this->xi;
-
-    cv::Mat undistorted;
-    double scale = 0.3;
-    cv::Matx33d KNew = cv::Matx33d(this->K(0,0)*scale, this->K(0,1), this->K(0,2),
-                                    0, this->K(1,1)*scale, this->K(1,2),
-                                    0,  0,  1);
-    cv::omnidir::undistortImage(imgDis, undistorted, _K, _D, xi, cv::omnidir::RECTIFY_PERSPECTIVE, KNew);
-
-    cv::imwrite("1_undis.bmp", undistorted);
+    int flags = cv::omnidir::CALIB_FIX_SKEW;
+    cv::omnidir::stereoCalibrate(v_object, v_image1, v_image2, imageSize, K1, xi1, D1, K2, xi2, D2, R, T, flags, critia);
 
 }
 

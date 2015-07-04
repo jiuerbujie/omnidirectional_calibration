@@ -179,7 +179,7 @@ namespace omnidir
     */
     CV_EXPORTS_W double stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
         Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
-        InputOutputArray D2, OutputArray R, OutputArray T, int flags, TermCriteria criteria);
+        InputOutputArray D2, OutputArray om, OutputArray T, int flags, TermCriteria criteria);
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
 
@@ -213,7 +213,7 @@ namespace internal
         OutputArrayOfArrays tAll, OutputArray K, double& xi, OutputArray idx = noArray());
     void initializeStereoCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
         Size size, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, OutputArray K1, OutputArray D1, OutputArray K2, OutputArray D2,
-        double &xi1, double &xi2);
+        double &xi1, double &xi2, int flags);
     void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
     void computeJacobianStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, 
         InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
@@ -224,16 +224,24 @@ namespace internal
     void decodeParametersStereo(InputArray parameters, OutputArray K1, OutputArray K2, OutputArray om, OutputArray T, OutputArrayOfArrays omL,
         OutputArrayOfArrays tL, OutputArray D1, OutputArray D2, double& xi1, double& xi2);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
-    double computeMeanReproerr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
-    double computeMeanReproerr(InputArrayOfArrays objetPoints, InputArrayOfArrays imagePoints, InputArray K, InputArray D, double xi, InputArrayOfArrays omAll,
+    double computeMeanReproErr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
+    double computeMeanReproErr(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray K, InputArray D, double xi, InputArrayOfArrays omAll,
         InputArrayOfArrays tAll);
+    double computeMeanReproErrStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, InputArray K1, InputArray K2,
+        InputArray D1, InputArray D2, double xi1, double xi2, InputArray om, InputArray T, InputArrayOfArrays omL, InputArrayOfArrays TL);
     void checkFixed(Mat &G, int flags, int n);
     void subMatrix(const Mat& src, Mat& dst, const std::vector<int>& cols, const std::vector<int>& rows);
     void flags2idx(int flags, std::vector<int>& idx, int n);
+    void flags2idxStereo(int flags, std::vector<int>& idx, int n);
     void fillFixed(Mat&G, int flags, int n);
+    void fillFixedStereo(Mat& G, int flags, int n);
     double findMedian(const Mat& row);
     Vec3d findMedian3(InputArray mat);
     void getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2);
+    void compose_motion(InputArray _om1, InputArray _T1, InputArray _om2, InputArray _T2, Mat& om3, Mat& T3, Mat& dom3dom1, 
+        Mat& dom3dT1, Mat& dom3dom2, Mat& dom3dT2, Mat& dT3dom1, Mat& dT3dT1, Mat& dT3dom2, Mat& dT3dT2);
+    void JRodriguesMatlab(const Mat& src, Mat& dst);
+    void dAB(InputArray A, InputArray B, OutputArray dABdA, OutputArray dABdB);
 } // internal
 
 
