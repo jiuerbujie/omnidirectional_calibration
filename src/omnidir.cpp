@@ -389,7 +389,8 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
             }
         }
     }
-    else if(flags == omnidir::RECTIFY_CYLINDRICAL || flags == omnidir::RECTIFY_LONGLATI)
+    else if(flags == omnidir::RECTIFY_CYLINDRICAL || flags == omnidir::RECTIFY_LONGLATI ||
+        flags == omnidir::RECTIFY_STEREOGRAPHIC)
     {
         for (int i = 0; i < size.height; ++i)
         {
@@ -417,7 +418,15 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
                     _yt = -std::cos(h);
                     _wt = -std::cos(theta)*std::sin(h);
                 }
-
+                else if (flags == omnidir::RECTIFY_STEREOGRAPHIC)
+                {
+                    double a = theta*theta + h*h + 4;
+                    double b = 2*theta*theta + 2*h*h;
+                    double c = theta*theta + h*h -4;
+                    _wt = (-b+std::sqrt(b*b - 4*a*c))/(2*a);
+                    _xt = theta*(_wt + 1) / 2;
+                    _yt = h*(_wt + 1) / 2;
+                }
                 double _x = iR(0,0)*_xt + iR(0,1)*_yt + iR(0,2)*_wt;
                 double _y = iR(1,0)*_xt + iR(1,1)*_yt + iR(1,2)*_wt;
                 double _w = iR(2,0)*_xt + iR(2,1)*_yt + iR(2,2)*_wt;

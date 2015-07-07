@@ -61,7 +61,8 @@ namespace omnidir
     enum{
         RECTIFY_PERSPECTIVE         = 1,
         RECTIFY_CYLINDRICAL         = 2,
-        RECTIFY_LONGLATI            = 3
+        RECTIFY_LONGLATI            = 3,
+        RECTIFY_STEREOGRAPHIC       = 4
     };
 /**
  * This module was accepted as a GSoC 2015 project for OpenCV, authored by
