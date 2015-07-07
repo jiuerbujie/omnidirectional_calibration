@@ -171,15 +171,17 @@ namespace omnidir
     @param K2 Output calibrated camera matrix. If you want to initialize K2 by yourself, input a non-empty K2.
     @param xi2 Ouput parameter xi for the second camera for CMei's model
     @param D2 Output distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the second camera
-    @param R Output rotation between the first and second camera
+    @param om Output rotation between the first and second camera
     @param T Output translation between the first and second camera
+    @param omL Output rotation for each image of the first camera
+    @param tL Output translation for each image of the first camera
     @param flags The flags that control stereoCalibrate
     @param criteria Termination criteria for optimization
     @
     */
     CV_EXPORTS_W double stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
         Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
-        InputOutputArray D2, OutputArray om, OutputArray T, int flags, TermCriteria criteria);
+        InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria);
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
 
@@ -224,6 +226,8 @@ namespace internal
     void decodeParametersStereo(InputArray parameters, OutputArray K1, OutputArray K2, OutputArray om, OutputArray T, OutputArrayOfArrays omL,
         OutputArrayOfArrays tL, OutputArray D1, OutputArray D2, double& xi1, double& xi2);
     void estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags);
+    void estimateUncertaintiesStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, InputArray parameters, Mat& errors,
+        Vec2d& std_error, double& rms, int flags);
     double computeMeanReproErr(InputArrayOfArrays imagePoints, InputArrayOfArrays proImagePoints);
     double computeMeanReproErr(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray K, InputArray D, double xi, InputArrayOfArrays omAll,
         InputArrayOfArrays tAll);

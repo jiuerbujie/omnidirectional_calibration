@@ -719,8 +719,8 @@ void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays
         imagePointsTemp2[i] = imagePoints2.getMat(i).clone();
     }
 
-    omnidir::calibrate(objectPointsTemp1, imagePointsTemp1, size, _K1, _xi1m, _D1, omAllTemp1, tAllTemp1, flags, TermCriteria(3, 100, 1e-6), idx1);
-    omnidir::calibrate(objectPointsTemp2, imagePointsTemp2, size, _K2, _xi2m, _D2, omAllTemp2, tAllTemp2, flags, TermCriteria(3, 100, 1e-6), idx2);
+    omnidir::calibrate(objectPointsTemp1, imagePointsTemp1, size, _K1, _xi1m, _D1, omAllTemp1, tAllTemp1, flags, TermCriteria(3, 50, 1e-6), idx1);
+    omnidir::calibrate(objectPointsTemp2, imagePointsTemp2, size, _K2, _xi2m, _D2, omAllTemp2, tAllTemp2, flags, TermCriteria(3, 50, 1e-6), idx2);
 
     // find the intersection
     Mat interIdx1, interIdx2;
@@ -875,14 +875,14 @@ void cv::omnidir::internal::computeJacobianStereo(InputArrayOfArrays objectPoint
     InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags)
 {
     CV_Assert(!objectPoints.empty() && objectPoints.type() == CV_64FC3);
-    CV_Assert(imagePoints1.empty() && imagePoints1.type() == CV_64FC2);
-    CV_Assert(imagePoints2.empty() && imagePoints2.type() == CV_64FC2);
+    CV_Assert(!imagePoints1.empty() && imagePoints1.type() == CV_64FC2);
+    CV_Assert(!imagePoints2.empty() && imagePoints2.type() == CV_64FC2);
     CV_Assert((imagePoints1.total() == imagePoints2.total()) && (imagePoints1.total() == objectPoints.total()));
 
     // compute Jacobian matrix by naive way
     int n_img = objectPoints.total();
     int n_points = objectPoints.getMat(0).total();
-    Mat J = Mat::zeros(4 * n_points * n_img, 20 * 6 * (n_img + 1), CV_64F);
+    Mat J = Mat::zeros(4 * n_points * n_img, 20 + 6 * (n_img + 1), CV_64F);
     Mat exAll = Mat::zeros(4 * n_points * n_img, 1, CV_64F);
     double *para = parameters.getMat().ptr<double>();
     int offset1 = (n_img + 1) * 6;
@@ -901,23 +901,24 @@ void cv::omnidir::internal::computeJacobianStereo(InputArrayOfArrays objectPoint
 
     Mat om = parameters.getMat().colRange(0, 3);
     Mat T = parameters.getMat().colRange(3, 6);
+
     for (int i = 0; i < n_img; i++)
     {
-        Mat objPoints, imgPoints1, imgPoints2, om1, T1, om, T;
-        objPoints = objectPoints.getMat(i);
-        imgPoints1 = imagePoints1.getMat(i);
-        imgPoints2 = imagePoints2.getMat(i);
+        Mat objPointsi, imgPoints1i, imgPoints2i, om1, T1, om, T;
+        objPointsi = objectPoints.getMat(i);
+        imgPoints1i = imagePoints1.getMat(i);
+        imgPoints2i = imagePoints2.getMat(i);
 
-        om1 = parameters.getMat().reshape(1, 1).colRange(6 + i*6, i*6+3);
-        T1 = parameters.getMat().reshape(1, 1).colRange(6 + i*6+3, (i+1)*6);
+        om1 = parameters.getMat().reshape(1, 1).colRange((1 + i) * 6, (1 + i) * 6 + 3);
+        T1 = parameters.getMat().reshape(1, 1).colRange((1 + i) * 6 + 3, (i + 1) * 6 + 6);
         om = parameters.getMat().reshape(1, 1).colRange(0, 3);
         T = parameters.getMat().reshape(1, 1).colRange(3, 6);
 
         Mat imgProj1, imgProj2, jacobian1, jacobian2;
 
         // jacobian for left image
-        cv::omnidir::projectPoints(objectPoints, imgProj1, om1, T1, K1, xi1, D1, jacobian1);
-        Mat projError1 = imgPoints1 - imgProj1;
+        cv::omnidir::projectPoints(objPointsi, imgProj1, om1, T1, K1, xi1, D1, jacobian1);
+        Mat projError1 = imgPoints1i - imgProj1;
         //Mat JIn1(jacobian1.rows, 10, CV_64F);
         //Mat JEx1(jacobian1.rows, 6, CV_64F);
         jacobian1.colRange(6, 16).copyTo(J(Rect(6*(n_img+1), i*n_points*4, 10, n_points*2)));
@@ -927,14 +928,17 @@ void cv::omnidir::internal::computeJacobianStereo(InputArrayOfArrays objectPoint
         //jacobian for right image
         Mat om2, T2, dom2dom1, dom2dT1, dom2dom, dom2dT, dT2dom1, dT2dT1, dT2dom, dT2dT;
         cv::omnidir::internal::compose_motion(om1, T1, om, T, om2, T2, dom2dom1, dom2dT1, dom2dom, dom2dT, dT2dom1, dT2dT1, dT2dom, dT2dT);
-        cv::omnidir::projectPoints(objectPoints, imgProj2, om2, T2, K2, xi2, D2, jacobian2);
-        Mat projError2 = imgPoints2 - imgProj2;
+        cv::omnidir::projectPoints(objPointsi, imgProj2, om2, T2, K2, xi2, D2, jacobian2);
+        Mat projError2 = imgPoints2i - imgProj2;
         projError2.reshape(1, 2*n_points).copyTo(exAll.rowRange((i*4+2)*n_points, (i*4+4)*n_points));
         Mat dxrdom = jacobian2.colRange(0, 3) * dom2dom + jacobian2.colRange(3, 6) * dT2dom;
         Mat dxrdT = jacobian2.colRange(0, 3) * dom2dT + jacobian2.colRange(3, 6) * dT2dT;
         Mat dxrdom1 = jacobian2.colRange(0, 3) * dom2dom1 + jacobian2.colRange(3, 6) * dT2dom1;
         Mat dxrdT1 = jacobian2.colRange(0, 3) * dom2dT1 + jacobian2.colRange(3, 6) * dT2dT1;
-        
+        //Mat dxrdom = jacobian2.colRange(0, 3) * dom2dom;
+        //Mat dxrdT = jacobian2.colRange(3, 6) * dT2dT;
+        //Mat dxrdom1 = jacobian2.colRange(0, 3) * dom2dom1;
+        //Mat dxrdT1 = jacobian2.colRange(3, 6) * dT2dT1;
         dxrdom.copyTo(J(Rect(0, (i*4+2)*n_points, 3, n_points*2)));
         dxrdT.copyTo(J(Rect(3, (i*4+2)*n_points, 3, n_points*2)));
         dxrdom1.copyTo(J(Rect(6+i*6, (i*4+2)*n_points, 3, n_points*2)));
@@ -942,9 +946,14 @@ void cv::omnidir::internal::computeJacobianStereo(InputArrayOfArrays objectPoint
         jacobian2.colRange(6, 16).copyTo(J(Rect(6*(n_img+1)+10, (4*i+2)*n_points, 10, n_points*2)));
     }
 
+    std::vector<int> _idx(6*(n_img+1)+20, 1);
+    flags2idxStereo(flags, _idx, n_img);
+
     Mat JTJ = J.t()*J;
     JTE = J.t()*exAll;
-    double epsilon = 1e-9;
+    subMatrix(JTJ, JTJ, _idx, _idx);
+    subMatrix(JTE, JTE, std::vector<int>(1, 1), _idx);
+    double epsilon = 1e-10;
     JTJ_inv = Mat(JTJ+epsilon).inv();
 }
 
@@ -1074,7 +1083,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     cv::omnidir::internal::encodeParameters(_K, _omAll, _tAll, Mat::zeros(1,4,CV_64F), _xi, currentParam);
 
     // optimization
-    const double alpha_smooth = 0.01;
+    const double alpha_smooth = 1;
     //const double thresh_cond = 1e6;
     double change = 1;
     for(int iter = 0; ; ++iter)
@@ -1083,7 +1092,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
             (criteria.type == 2 && change <= criteria.epsilon) ||
             (criteria.type == 3 && (change <= criteria.epsilon || iter >= criteria.maxCount)))
             break;
-        double alpha_smooth2 = 1 - std::pow(1 - alpha_smooth, (double)iter/10 + 1.0);
+        double alpha_smooth2 = 1 - std::pow(1 - alpha_smooth, (double)iter + 1.0);
         Mat JTJ_inv, JTError;
 
         cv::omnidir::internal::computeJacobian(patternPoints, imagePoints, currentParam, JTJ_inv, JTError, flags);
@@ -1119,7 +1128,9 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
         Mat(_omAll).convertTo(omAll, CV_64FC3);
         Mat(_tAll).convertTo(tAll, CV_64FC3);
     }
-    
+
+    Mat(_K).copyTo(K.getMat());
+    Mat(_D).copyTo(D.getMat());
     xi.create(1, 1, CV_64F);
     Mat xi_m = Mat(1, 1, CV_64F);
     xi_m.at<double>(0) = _xi;
@@ -1133,7 +1144,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
 
 double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
     Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
-    InputOutputArray D2, OutputArray om, OutputArray T, int flags, TermCriteria criteria)
+    InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria)
 {
     CV_Assert(!objectPoints.empty() && !imagePoints1.empty() && !imagePoints2.empty());
     CV_Assert(objectPoints.type() == CV_64FC3 && imagePoints1.type() == CV_64FC2 && imagePoints2.type() == CV_64FC2);
@@ -1165,11 +1176,12 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     n = objectPoints.total();
     Mat finalParam(1, 10 + 6*n, CV_64F);
     Mat currentParam(1, 10 + 6*n, CV_64F);
+    double repr1 = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om, 
+        _T, _omL, _TL);
     cv::omnidir::internal::encodeParametersStereo(_K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2, currentParam);
 
     // optimization
-    const double alpha_smooth = 0.01;
-    //const double thresh_cond = 1e6;
+    const double alpha_smooth = 0.4;
     double change = 1;
     for(int iter = 0; ; ++iter)
     {
@@ -1184,7 +1196,7 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
 
         // Gauss¨CNewton
         Mat G = alpha_smooth2*JTJ_inv * JTError;
-
+        
         omnidir::internal::fillFixedStereo(G, flags, n);
 
         finalParam = currentParam + G.t();
@@ -1192,16 +1204,26 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
         change = norm(G) / norm(currentParam);
 
         currentParam = finalParam.clone();
-
         cv::omnidir::internal::decodeParametersStereo(currentParam, _K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2);
         double repr = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om, 
             _T, _omL, _TL);
-    }
 
+    }
     cv::omnidir::internal::decodeParametersStereo(finalParam, _K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2);
     double repr = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om, 
         _T, _omL, _TL);
-
+    if (K1.empty())
+    {
+        K1.create(3, 3, CV_64F);
+        D1.create(1, 4, CV_64F);
+        K2.create(3, 3, CV_64F);
+        D2.create(1, 4, CV_64F);
+    }
+    if (om.empty())
+    {
+        om.create(1, 3, CV_64F);
+        T.create(1, 3, CV_64F);
+    }
     _K1.copyTo(K1.getMat());
     _D1.copyTo(D1.getMat());
     _K2.copyTo(K2.getMat());
@@ -1209,21 +1231,27 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     Mat(_om).copyTo(om.getMat());
     Mat(_T).copyTo(T.getMat());
 
+    if (omL.kind() == _InputArray::STD_VECTOR_MAT)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            Mat(_omL[i]).copyTo(omL.getMat(i));
+            Mat(_TL[i]).copyTo(tL.getMat(i));
+        }
+    }
+    else
+    {
+        Mat(_omL).convertTo(omL, CV_64FC3);
+        Mat(_TL).convertTo(tL, CV_64FC3);
+    }
 
-    //if (omL.kind() == _InputArray::STD_VECTOR_MAT)
-    //{
-    //    for (int i = 0; i < n; ++i)
-    //    {
-    //        Mat(_omAll[i]).copyTo(omAll.getMat(i));
-    //        Mat(_tAll[i]).copyTo(tAll.getMat(i));
-    //    }
-    //}
-    //else
-    //{
-    //    Mat(_omAll).convertTo(omAll, CV_64FC3);
-    //    Mat(_tAll).convertTo(tAll, CV_64FC3);
-    //}
-    return 1;
+    // compute uncertainty
+    Vec2d std_error;
+    double rms;
+    Mat errors;
+
+    cv::omnidir::internal::estimateUncertaintiesStereo(objectPoints, imagePoints1, imagePoints2, finalParam, errors, std_error, rms, flags);
+    return rms;
 }
 
 void cv::omnidir::internal::encodeParameters(InputArray K, InputArrayOfArrays omAll, InputArrayOfArrays tAll, InputArray distoaration, double xi, OutputArray parameters)
@@ -1262,7 +1290,7 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
     CV_Assert(!K2.empty() && K2.type() == CV_64F && K2.size() == Size(3,3));
     CV_Assert(!om.empty() && om.type() == CV_64F && om.total() == 3);
     CV_Assert(!T.empty() && T.type() == CV_64F && T.total() == 3);
-    CV_Assert(omL.total() == tL.total() && omL.type() == CV_64F && tL.type() == CV_64F);
+    CV_Assert(omL.total() == tL.total() && omL.type() == CV_64FC3 && tL.type() == CV_64FC3);
     CV_Assert(D1.type() == CV_64F && D1.total() == 4 && D2.type() == CV_64F && D2.total() == 4);
 
     int n = (int)omL.total();
@@ -1275,8 +1303,8 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
     T.getMat().reshape(1, 1).copyTo(_params.colRange(3, 6));
     for(int i = 0; i < n; ++i)
     {
-        omL.getMat(i).reshape(1, 1).copyTo(_params.colRange(6 + i*6, 6 + i*6 + 3));
-        tL.getMat(i).reshape(1, 1).copyTo(_params.colRange(6 + i*6 + 3, 6 + i*6 + 6));
+        Mat(omL.getMat().at<Vec3d>(i)).reshape(1, 1).copyTo(_params.colRange(6 + i*6, 6 + i*6 + 3));
+        Mat(tL.getMat().at<Vec3d>(i)).reshape(1, 1).copyTo(_params.colRange(6 + i*6 + 3, 6 + i*6 + 6));
     }
     
     Matx33d _K1 = K1.getMat();
@@ -1330,15 +1358,26 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
     vector<Vec3d> _omAll(n), _tAll(n);
     for (int i = 0; i < n; i++)
     {
-        //param.colRange(i*6, i*6+3).reshape(3, 1).copyTo(_omAll[i]);
-        //param.colRange(i*6+3, i*6+6).reshape(3, 1).copyTo(_tAll[i]);
         _omAll[i] = Vec3d(param.colRange(i*6, i*6+3));
         _tAll[i] = Vec3d(param.colRange(i*6+3, i*6+6));
     }
     Mat(_D).convertTo(distoration, CV_64F);
     Mat(_K).convertTo(K, CV_64F);
-    Mat(_omAll).convertTo(omAll, CV_64FC3);
-    Mat(_tAll).convertTo(tAll, CV_64FC3);
+
+    if (omAll.kind() == _InputArray::STD_VECTOR_MAT)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            Mat(_omAll[i]).copyTo(omAll.getMat(i));
+            Mat(_tAll[i]).copyTo(tAll.getMat(i));
+        }
+    }
+    else
+    {
+        Mat(_omAll).convertTo(omAll, CV_64FC3);
+        Mat(_tAll).convertTo(tAll, CV_64FC3);
+    }
+    
 }
 
  void cv::omnidir::internal::decodeParametersStereo(InputArray parameters, OutputArray K1, OutputArray K2, OutputArray om, OutputArray T, OutputArrayOfArrays omL,
@@ -1349,27 +1388,30 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
     if(K2.empty())
         K2.create(3, 3, CV_64F);
     if(om.empty())
-        om.create(1, 3, CV_64F);
+        om.create(3, 1, CV_64F);
     if(T.empty())
-        T.create(1, 3, CV_64F);
+        T.create(3, 1, CV_64F);
+
     int n = (parameters.total() - 20) / 6 - 1;
+
     if(omL.empty())
-        om.create(1, n, CV_64FC3);
+        omL.create(1, n, CV_64FC3);
     if(tL.empty())
         tL.create(1, n, CV_64FC3);
     if(D1.empty())
         D1.create(1, 4, CV_64F);
     if(D2.empty())
         D2.create(1, 4, CV_64F);
-    Mat param = parameters.getMat().reshape(1, 1);
 
-    param.colRange(0, 3).copyTo(om.getMat());
-    param.colRange(3, 6).copyTo(T.getMat());
+    Mat param = parameters.getMat().reshape(1, 1);
+    param.colRange(0, 3).reshape(1, 3).copyTo(om.getMat());
+    param.colRange(3, 6).reshape(1, 3).copyTo(T.getMat());
+    vector<Vec3d> _omL, _tL;
 
     for(int i = 0; i < n; i++)
     {
-        param.colRange(6 + i*6, 6 + i*6 + 3).copyTo(omL.getMat(i));
-        param.colRange(6 + i*6 + 3, 6 + i*6 + 6).copyTo(tL.getMat(i));
+        _omL.push_back(Vec3d(param.colRange(6 + i*6, 6 + i*6 + 3)));
+        _tL.push_back(Vec3d(param.colRange(6 + i*6 + 3, 6 + i*6 + 6)));
     }
 
     double* para = param.ptr<double>();
@@ -1379,16 +1421,31 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
                 0,          0,                  1);
     xi1 = para[offset1+5];
     Matx14d _D1(para[offset1+6], para[offset1+7], para[offset1+8], para[offset1+9]);
+
     int offset2 = (n + 1)*6 + 10;
     Matx33d _K2(para[offset2], para[offset2+2], para[offset2+3],
                 0,      para[offset2+1],     para[offset2+4],
                 0,          0,                  1);
     xi2 = para[offset2+5];
     Matx14d _D2(para[offset2+6], para[offset2+7], para[offset2+8], para[offset2+9]);
+
     Mat(_K1).convertTo(K1, CV_64F);
     Mat(_D1).convertTo(D1, CV_64F);
     Mat(_K2).convertTo(K2, CV_64F);
     Mat(_D2).convertTo(D2, CV_64F);
+    if(omL.kind() == _InputArray::STD_VECTOR_MAT)
+    {
+        for(int i = 0; i < n; ++i)
+        {
+            Mat(_omL[i]).copyTo(omL.getMat(i));
+            Mat(_tL[i]).copyTo(tL.getMat(i));
+        }
+    }
+    else
+    {
+        Mat(_omL).convertTo(omL, CV_64FC3);
+        Mat(_tL).convertTo(tL, CV_64FC3);
+    }
  }
 
 void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters,
@@ -1431,10 +1488,10 @@ void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoint
     meanStdDev(reprojError, noArray(), std_error);
     std_error *= sqrt((double)reprojError.total()/((double)reprojError.total() - 1.0));
 
-    Mat simga_x;
-    meanStdDev(reprojError.reshape(1,1), noArray(), simga_x);
-    simga_x *= sqrt(2.0*(double)reprojError.total()/(2.0*(double)reprojError.total() - 1.0));
-    double s = simga_x.at<double>(0);
+    Mat sigma_x;
+    meanStdDev(reprojError.reshape(1,1), noArray(), sigma_x);
+    sigma_x *= sqrt(2.0*(double)reprojError.total()/(2.0*(double)reprojError.total() - 1.0));
+    double s = sigma_x.at<double>(0);
 
     Mat _JTJ_inv, _JTE;
     computeJacobian(objectPoints, imagePoints, parameters, _JTJ_inv, _JTE, flags);
@@ -1452,6 +1509,86 @@ void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoint
     }
 
     rms /= (double)reprojError.total();
+    rms = sqrt(rms);
+}
+
+// estimateUncertaintiesStereo
+void cv::omnidir::internal::estimateUncertaintiesStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, 
+    InputArray parameters, Mat& errors, Vec2d& std_error, double& rms, int flags)
+{
+    CV_Assert(!objectPoints.empty() && objectPoints.type() == CV_64FC3);
+    CV_Assert(!imagePoints1.empty() && imagePoints1.type() == CV_64FC2 && imagePoints1.total() == objectPoints.total());
+    CV_Assert(!imagePoints2.empty() && imagePoints2.type() == CV_64FC2 && imagePoints1.total() == imagePoints2.total());
+    int n_img = objectPoints.total();
+    CV_Assert((int)parameters.total() == (6*(n_img+1)+20));
+
+    Mat _K1, _K2, _D1, _D2;
+    Vec3d _om, _T;
+    vector<Vec3d> _omL(n_img), _tL(n_img);
+    Mat _parameters = parameters.getMat().reshape(1, 1);
+    double _xi1, _xi2;
+    internal::decodeParametersStereo(_parameters, _K1, _K2, _om, _T, _omL, _tL, _D1, _D2, _xi1, _xi2);
+
+    int n_points = objectPoints.getMat(0).total();
+    Mat reprojErrorAll = Mat::zeros(2*n_points*n_img, 1, CV_64FC2);
+
+    // error for left image
+    for (int i = 0; i < n_img; ++i)
+    {
+        Mat objPointsi = objectPoints.getMat(i);
+        Mat imgPointsi = imagePoints1.getMat(i);
+
+        Mat x;
+        omnidir::projectPoints(objPointsi, x, _omL[i], _tL[i], _K1, _xi1, _D1, cv::noArray());
+
+        Mat errorx = imgPointsi - x;
+
+        errorx.copyTo(reprojErrorAll.rowRange(i*2*n_points, (i*2+1)*n_points));
+    }
+    // error for right image
+    for (int i = 0; i < n_img; ++i)
+    {
+        Mat objPointsi = objectPoints.getMat(i);
+        Mat imgPointsi = imagePoints2.getMat(i);
+
+        Mat x;
+        Mat _R, _R2, _R1, _T2, _T1, _om2;
+        Rodrigues(_om, _R);
+        Rodrigues(_omL[i], _R1);
+        _T1 = Mat(_tL[i]);
+        _R2 = _R * _R1;
+        _T2 = _R * _T1 + Mat(_T);
+        Rodrigues(_R2, _om2);
+
+        omnidir::projectPoints(objPointsi, x, _om2, _T2, _K2, _xi2, _D2, cv::noArray());
+
+        Mat errorx = imgPointsi - x;
+
+        errorx.copyTo(reprojErrorAll.rowRange((i*2+1)*n_points, (i+1)*2*n_points));
+    }
+
+    meanStdDev(reprojErrorAll, cv::noArray(), std_error);
+    std_error *= sqrt((double)reprojErrorAll.total()/((double)reprojErrorAll.total() - 1.0));
+
+    Mat sigma_x;
+    meanStdDev(reprojErrorAll.reshape(1,1), noArray(), sigma_x);
+    sigma_x *= sqrt(2.0*(double)reprojErrorAll.total()/(2.0*(double)reprojErrorAll.total() - 1.0));
+    double s = sigma_x.at<double>(0);
+
+    Mat _JTJ_inv, _JTE;
+    computeJacobianStereo(objectPoints, imagePoints1, imagePoints2, _parameters, _JTJ_inv, _JTE, flags);
+    cv::sqrt(_JTJ_inv, _JTJ_inv);
+
+    errors = 3 * s * _JTJ_inv.diag();
+
+    rms = 0;
+
+    const Vec2d* ptr_ex = reprojErrorAll.ptr<Vec2d>();
+    for (int i = 0; i < (int)reprojErrorAll.total(); i++)
+    {
+        rms += ptr_ex[i][0] * ptr_ex[i][0] + ptr_ex[i][1] * ptr_ex[i][1];
+    }
+    rms /= (double)reprojErrorAll.total();
     rms = sqrt(rms);
 }
 
@@ -1550,8 +1687,11 @@ double cv::omnidir::internal::computeMeanReproErrStereo(InputArrayOfArrays objec
         cv::omnidir::projectPoints(objectPoints.getMat(i), imgPoints, _omRi, _TRi, _K2, xi2, _D2, cv::noArray());
         proImagePoints2.push_back(imgPoints);
     }
-
-    double reProErr = internal::computeMeanReproErr(imagePoints1, proImagePoints1) + internal::computeMeanReproErr(imagePoints2, proImagePoints2) / 2.0;
+    double reProErr1 = internal::computeMeanReproErr(imagePoints1, proImagePoints1);
+    double reProErr2 = internal::computeMeanReproErr(imagePoints2, proImagePoints2);
+    
+    double reProErr = (reProErr1 + reProErr2) / 2.0;
+    //double reProErr = reProErr1*reProErr1 + reProErr2* reProErr2;
     return reProErr;
 }
 
@@ -1760,8 +1900,8 @@ void cv::omnidir::internal::fillFixedStereo(Mat& G, int flags, int n)
     std::vector<int> idx(6*(n+1)+20, 1);
     flags2idxStereo(flags, idx, n);
     G.release();
-    G.create(6*n +10, 1, CV_64F);
-    G = cv::Mat::zeros(6*n +10, 1, CV_64F);
+    G.create(6 * (n+1) + 20, 1, CV_64F);
+    G = cv::Mat::zeros(6* (n + 1) + 20, 1, CV_64F);
     for (int i = 0,j=0; i < (int)idx.size(); i++)
     {
         if (idx[i])

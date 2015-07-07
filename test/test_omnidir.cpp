@@ -292,9 +292,10 @@ TEST_F(omnidirTest, calibrateStereo)
     fs["imageSize"] >> imageSize;
     cv::Mat K1, K2, D1, D2, xi1, xi2;
     cv::Vec3d R, T;
-    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
+    std::vector<cv::Vec3d> omL, tL;
+    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 1e-6);
     int flags = cv::omnidir::CALIB_FIX_SKEW;
-    cv::omnidir::stereoCalibrate(v_object, v_image1, v_image2, imageSize, K1, xi1, D1, K2, xi2, D2, R, T, flags, critia);
+    cv::omnidir::stereoCalibrate(v_object, v_image1, v_image2, imageSize, K1, xi1, D1, K2, xi2, D2, R, T, omL, tL, flags, critia);
 
 }
 
