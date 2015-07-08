@@ -201,14 +201,9 @@ namespace omnidir
     camera.
     @param P2 Output 3x4 projection matrix in the rectified coordinate systems for the second
     camera.
-    @param Q Output 4x4 disparity-to-depth mapping matrix
-    @param flags The flags that control stereoRectify
-    @param newImageSize New image size of rectified images. When it is (0,0), the new image size is
-    equivalent to imageSize
     */
     CV_EXPORTS_W void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
-        InputArray R, InputArray tvec, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2, OutputArray Q, int flags,
-        const Size& newImageSize);
+        InputArray om, InputArray T, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2);
 
 namespace internal
 {

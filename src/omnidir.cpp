@@ -1938,12 +1938,48 @@ cv::Vec3d cv::omnidir::internal::findMedian3(InputArray mat)
     return Vec3d(findMedian(M.row(0)), findMedian(M.row(1)), findMedian(M.row(2)));
 }
 
-//void cv::omnidir::stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
-//    InputArray R, InputArray tvec, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2, OutputArray Q, int flags,
-//    const Size& newImageSize)
-//{
-//
-//}
+void cv::omnidir::stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2, const Size imageSize,
+    InputArray R, InputArray T, OutputArray R1, OutputArray R2, OutputArray P1, OutputArray P2)
+{
+    CV_Assert(K1.size() == Size(3, 3) && K1.type() == CV_64F);
+    CV_Assert(K2.size() == Size(3, 3) && K2.type() == CV_64F);
+    CV_Assert(D1.total() == 4 && D1.type() == CV_64F);
+    CV_Assert(D2.total() == 4 && D2.type() == CV_64F);
+    Mat _K1 = K1.getMat(), _K2 = K2.getMat(),
+        _D1 = D1.getMat(), _D2 = D2.getMat();
+    Mat _R = R.getMat();
+    Mat _T = T.getMat().reshape(1, 3);
+    R1.create(3, 3, CV_64F);
+    Mat _R1 = R1.getMat();
+    R2.create(3, 3, CV_64F);
+    Mat _R2 = R2.getMat();
+    P1.create(3, 4, CV_64F);
+    P2.create(3, 4, CV_64F);
+    Mat _P1 = P1.getMat();
+    Mat _P2 = P2.getMat();
+
+    Mat R21 = _R.t();
+    Mat T21 = -_R.t() * _T;
+
+    Mat e1, e2, e3;
+    e1 = T21.t() / norm(T21);
+    e2 = Mat(Matx13d(T21.at<double>(1)*-1, T21.at<double>(0), 0.0));
+    e2 = e2 / norm(e2);
+    e3 = e1.cross(e2);
+    e3 = e3 / norm(e3);
+    e1.copyTo(_R1.row(0));
+    e2.copyTo(_R1.row(1));
+    e3.copyTo(_R1.row(2));
+    _R2 = R21 * _R1;
+
+    _P1.setTo(Scalar(0));
+    _R1.copyTo(_P1.colRange(0, 3));
+    _P1 = _K1 * _P1;
+
+    _P2.setTo(Scalar(0));
+    _R2.copyTo(_P2.colRange(0, 3));
+    _P2 = _K2 * _P2;
+}
 
 void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2)
 {
