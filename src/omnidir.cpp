@@ -1094,7 +1094,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     cv::omnidir::internal::encodeParameters(_K, _omAll, _tAll, Mat::zeros(1,4,CV_64F), _xi, currentParam);
 
     // optimization
-    const double alpha_smooth = 1;
+    const double alpha_smooth = 0.4;
     //const double thresh_cond = 1e6;
     double change = 1;
     for(int iter = 0; ; ++iter)
@@ -1139,7 +1139,11 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
         Mat(_omAll).convertTo(omAll, CV_64FC3);
         Mat(_tAll).convertTo(tAll, CV_64FC3);
     }
-
+    if(K.empty())
+    {
+        K.create(3, 3, CV_64F);
+        D.create(1, 4, CV_64F);
+    }
     Mat(_K).copyTo(K.getMat());
     Mat(_D).copyTo(D.getMat());
     xi.create(1, 1, CV_64F);
@@ -1234,6 +1238,11 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     {
         om.create(1, 3, CV_64F);
         T.create(1, 3, CV_64F);
+    }
+    if (omL.empty())
+    {
+        omL.create(1, n, CV_64FC3);
+        tL.create(1, n, CV_64FC3);
     }
     _K1.copyTo(K1.getMat());
     _D1.copyTo(D1.getMat());
@@ -1462,7 +1471,6 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
         Mat(_omAll).convertTo(omAll, CV_64FC3);
         Mat(_tAll).convertTo(tAll, CV_64FC3);
     }
-
 }
 
  void cv::omnidir::internal::decodeParametersStereo(InputArray parameters, OutputArray K1, OutputArray K2, OutputArray om, OutputArray T, OutputArrayOfArrays omL,

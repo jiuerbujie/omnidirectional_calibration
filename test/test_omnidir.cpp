@@ -237,32 +237,32 @@ TEST_F(omnidirTest, jacobian)
 //    EXPECT_LT(meanReprojError, 15);
 //}
 
-//TEST_F(omnidirTest, calibration)
-//{
-//    // load pattern points and image points, you should assign your path of the corner file.
-//    cv::FileStorage fs("corners_sim.xml", cv::FileStorage::READ);
-//    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
-//    cv::Size imgSize;
-//    fs["objectPoints"] >> v_patternPoints;
-//    fs["imagePoints"] >> v_imagePoints;
-//    fs["imageSize"] >> imgSize;
-//
-//    std::vector<cv::Mat> pattern_input, image_input;
-//    for (int i = 0; i < (int)v_patternPoints.size(); i++)
-//    {
-//        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
-//        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
-//        pattern_input.push_back(v_patternPoints[i]);
-//        image_input.push_back(v_imagePoints[i]);
-//    }
-//    cv::Mat K, D, omAll, tAll;
-//    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
-//    cv::Vec<double, 1> xi ;
-//    int flag = cv::omnidir::CALIB_FIX_SKEW;
-//    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
-//
-//    EXPECT_LT(rms, 2);
-//}
+TEST_F(omnidirTest, calibration)
+{
+    // load pattern points and image points, you should assign your path of the corner file.
+    cv::FileStorage fs("corners_fisheye2_right.xml", cv::FileStorage::READ);
+    std::vector<cv::Mat> v_patternPoints, v_imagePoints;
+    cv::Size imgSize;
+    fs["objectPoints"] >> v_patternPoints;
+    fs["imagePoints"] >> v_imagePoints;
+    fs["imageSize"] >> imgSize;
+
+    std::vector<cv::Mat> pattern_input, image_input;
+    for (int i = 0; i < (int)v_patternPoints.size(); i++)
+    {
+        v_patternPoints[i].convertTo(v_patternPoints[i], CV_64FC3);
+        v_imagePoints[i].convertTo(v_imagePoints[i], CV_64FC2);
+        pattern_input.push_back(v_patternPoints[i]);
+        image_input.push_back(v_imagePoints[i]);
+    }
+    cv::Mat K, D, omAll, tAll;
+    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
+    cv::Vec<double, 1> xi ;
+    int flag = cv::omnidir::CALIB_FIX_SKEW;
+    double rms = cv::omnidir::calibrate(pattern_input, image_input, imgSize, K, xi, D, omAll, tAll, flag, critia);
+
+    EXPECT_LT(rms, 2);
+}
 
 //TEST_F(omnidirTest, undistort)
 //{
