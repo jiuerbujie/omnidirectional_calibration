@@ -520,16 +520,24 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
     Mat _K;
     for (int image_idx = 0; image_idx < n_img; ++image_idx)
     {
-        cv::Mat objPoints = patternPoints.getMat(image_idx);
-        cv::Mat imgPoints = imagePoints.getMat(image_idx);
+        cv::Mat objPoints, imgPoints;
+		patternPoints.getMat(image_idx).copyTo(objPoints);
+		imagePoints.getMat(image_idx).copyTo(imgPoints);
+        
+		int n_point = imgPoints.rows * imgPoints.cols;
+		if (objPoints.rows != n_point)
+			objPoints = objPoints.reshape(3, n_point);
+		if (imgPoints.rows != n_point)
+			imgPoints = imgPoints.reshape(2, n_point);
+
         // objectPoints should be 3-channel data, imagePoints should be 2-channel data
-        CV_Assert(objPoints.type() == CV_64FC3 && imgPoints.type() == CV_64FC2);
+        CV_Assert(objPoints.type() == CV_64FC3 && imgPoints.type() == CV_64FC2 );
 
         std::vector<cv::Mat> xy, uv;
         cv::split(objPoints, xy);
         cv::split(imgPoints, uv);
 
-        int n_point = imgPoints.rows * imgPoints.cols;
+        
         cv::Mat x = xy[0].reshape(1, n_point), y = xy[1].reshape(1, n_point),
                 u = uv[0].reshape(1, n_point) - u0, v = uv[1].reshape(1, n_point) - v0;
 
@@ -548,7 +556,7 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
         V = V.t();
 
         double miniReprojectError = 1e5;
-        // the signs of r1, r2, r3 are unkown, so they can be flipped.
+        // the signs of r1, r2, r3 are unknown, so they can be flipped.
         for (int coef = 1; coef >= -1; coef-=2)
         {
             double r11 = V.at<double>(0, 5) * coef;
@@ -621,7 +629,7 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
                 Mat projedImgPoints;
                 Matx33d Kc(gamma, 0, u0, 0, gamma, v0, 0, 0, 1);
 
-                // reproj error
+                // reproject error
                 cv::omnidir::projectPoints(objPoints, projedImgPoints, om, t, Kc, 1, Matx14d(0, 0, 0, 0), cv::noArray());
                 double reprojectError = omnidir::internal::computeMeanReproErr(imgPoints, projedImgPoints);
 
@@ -710,7 +718,7 @@ void cv::omnidir::internal::initializeCalibration(InputOutputArrayOfArrays patte
 
 void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
     Size size, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, OutputArray K1, OutputArray D1, OutputArray K2, OutputArray D2,
-    double &xi1, double &xi2, int flags)
+    double &xi1, double &xi2, int flags, OutputArray idx)
 {
     int n = objectPoints.total();
     Mat idx1, idx2;
@@ -720,7 +728,7 @@ void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays
 
     std::vector<Vec3d> omAllTemp1, omAllTemp2, tAllTemp1, tAllTemp2;
 
-    vector<Mat> objectPointsTemp1(n), objectPointsTemp2(n), imagePointsTemp1(n), imagePointsTemp2(n);
+    std::vector<Mat> objectPointsTemp1(n), objectPointsTemp2(n), imagePointsTemp1(n), imagePointsTemp2(n);
 
     for (int i = 0; i < n; ++i)
     {
@@ -734,9 +742,12 @@ void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays
     omnidir::calibrate(objectPointsTemp2, imagePointsTemp2, size, _K2, _xi2m, _D2, omAllTemp2, tAllTemp2, flags, TermCriteria(3, 50, 1e-6), idx2);
 
     // find the intersection
-    Mat interIdx1, interIdx2;
+    Mat interIdx1, interIdx2, interOri;
 
-    getInterset(idx1, idx2, interIdx1, interIdx2);
+    getInterset(idx1, idx2, interIdx1, interIdx2, interOri);
+    if (idx.empty())
+        idx.create(1, (int)interOri.total(), CV_32S);
+    interOri.copyTo(idx.getMat());
 
     int n_inter = (int)interIdx1.total();
     int depth1 = objectPoints.depth(), depth2 = imagePoints1.depth();
@@ -835,8 +846,12 @@ void cv::omnidir::internal::computeJacobian(InputArrayOfArrays objectPoints, Inp
     for (int i = 0; i < n; i++)
     {
         Mat objPoints, imgPoints, om, T;
-        objPoints = objectPoints.getMat(i);
-        imgPoints = imagePoints.getMat(i);
+		objectPoints.getMat(i).copyTo(objPoints);
+		imagePoints.getMat(i).copyTo(imgPoints);
+		objPoints = objPoints.reshape(3, objPoints.rows*objPoints.cols);
+		imgPoints = imgPoints.reshape(2, imgPoints.rows*imgPoints.cols);
+        //objPoints = objectPoints.getMat(i);
+        //imgPoints = imagePoints.getMat(i);
 
         om = parameters.getMat().colRange(i*6, i*6+3);
         T = parameters.getMat().colRange(i*6+3, (i+1)*6);
@@ -916,9 +931,15 @@ void cv::omnidir::internal::computeJacobianStereo(InputArrayOfArrays objectPoint
     for (int i = 0; i < n_img; i++)
     {
         Mat objPointsi, imgPoints1i, imgPoints2i, om1, T1, om, T;
-        objPointsi = objectPoints.getMat(i);
-        imgPoints1i = imagePoints1.getMat(i);
-        imgPoints2i = imagePoints2.getMat(i);
+        //objPointsi = objectPoints.getMat(i);
+        //imgPoints1i = imagePoints1.getMat(i);
+        //imgPoints2i = imagePoints2.getMat(i);
+        objectPoints.getMat(i).copyTo(objPointsi);
+        imagePoints1.getMat(i).copyTo(imgPoints1i);
+        imagePoints2.getMat(i).copyTo(imgPoints2i);
+        objPointsi = objPointsi.reshape(3, objPointsi.rows*objPointsi.cols);
+        imgPoints1i = imgPoints1i.reshape(2, imgPoints1i.rows*imgPoints1i.cols);
+        imgPoints2i = imgPoints2i.reshape(2, imgPoints2i.rows*imgPoints2i.cols);
 
         om1 = parameters.getMat().reshape(1, 1).colRange((1 + i) * 6, (1 + i) * 6 + 3);
         T1 = parameters.getMat().reshape(1, 1).colRange((1 + i) * 6 + 3, (i + 1) * 6 + 6);
@@ -1084,7 +1105,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
 
     double _xi;
     // initialization
-    vector<Vec3d> _omAll, _tAll;
+    std::vector<Vec3d> _omAll, _tAll;
     Matx33d _K;
     Matx14d _D;
     cv::omnidir::internal::initializeCalibration(patternPoints, imagePoints, size, _omAll, _tAll, _K, _xi, idx);
@@ -1094,7 +1115,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     cv::omnidir::internal::encodeParameters(_K, _omAll, _tAll, Mat::zeros(1,4,CV_64F), _xi, currentParam);
 
     // optimization
-    const double alpha_smooth = 0.4;
+    const double alpha_smooth = 0.1;
     //const double thresh_cond = 1e6;
     double change = 1;
     for(int iter = 0; ; ++iter)
@@ -1159,7 +1180,7 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
 
 double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
     Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
-    InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria)
+    InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria, OutputArray idx)
 {
     CV_Assert(!objectPoints.empty() && !imagePoints1.empty() && !imagePoints2.empty());
     CV_Assert(objectPoints.type() == CV_64FC3 && imagePoints1.type() == CV_64FC2 && imagePoints2.type() == CV_64FC2);
@@ -1186,8 +1207,14 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     Vec3d _om, _T;
 
     // initializaiton
-    internal::initializeStereoCalibration(objectPoints, imagePoints1, imagePoints2, imageSize, _om, _T, _omL, _TL, _K1, _D1, _K2, _D2, _xi1, _xi2, flags);
-
+    Mat _idx;
+    internal::initializeStereoCalibration(objectPoints, imagePoints1, imagePoints2, imageSize, _om, _T, _omL, _TL, _K1, _D1, _K2, _D2, _xi1, _xi2, flags, _idx);
+    if(idx.needed())
+    {
+        idx.create(1, (int)_idx.total(), CV_32S);
+        _idx.copyTo(idx.getMat());
+    }
+    
     n = objectPoints.total();
     Mat finalParam(1, 10 + 6*n, CV_64F);
     Mat currentParam(1, 10 + 6*n, CV_64F);
@@ -1196,7 +1223,7 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     cv::omnidir::internal::encodeParametersStereo(_K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2, currentParam);
 
     // optimization
-    const double alpha_smooth = 0.4;
+    const double alpha_smooth = 0.1;
     double change = 1;
     for(int iter = 0; ; ++iter)
     {
@@ -1304,8 +1331,10 @@ void cv::omnidir::stereoReconstruct(InputArray image1, InputArray image2, InputA
     Mat _depthMap;
     int channel = image1.channels();
 
-    cv::StereoSGBM matching(0, numDisparities, SADWindowSize, 8*channel*SADWindowSize*SADWindowSize, 32*channel*SADWindowSize*SADWindowSize);
-    matching(undis1, undis2, _depthMap);
+    //cv::StereoSGBM matching(0, numDisparities, SADWindowSize, 8*channel*SADWindowSize*SADWindowSize, 32*channel*SADWindowSize*SADWindowSize);
+    //matching(undis1, undis2, _depthMap);
+	Ptr<StereoSGBM> sgbm = StereoSGBM::create(0, numDisparities, SADWindowSize, 8 * channel*SADWindowSize*SADWindowSize, 32 * channel*SADWindowSize*SADWindowSize);
+	sgbm->compute(undis1, undis2, _depthMap);
     depthMap.create(_depthMap.size(), _depthMap.type());
     _depthMap.copyTo(depthMap.getMat());
     Mat realDepthMap;
@@ -1314,38 +1343,40 @@ void cv::omnidir::stereoReconstruct(InputArray image1, InputArray image2, InputA
     std::vector<Vec3d> _pointCloud;
     double baseline = cv::norm(T);
     Matx33d K_inv = _Knew.inv();
-
-    for (int i = 0; i < newSize.width; ++i)
+    if (pointCloud.needed())
     {
-        for(int j = 0; j < newSize.height; ++j)
+        for (int i = 0; i < newSize.width; ++i)
         {
-            Vec3d point;
-            double depth = realDepthMap.at<double>(j, i);
-            if (depth > 0 )
+            for(int j = 0; j < newSize.height; ++j)
             {
-                // for RECTIFY_PERSPECTIVE, (x,y) are image plane points,
-                // for RECTIFY_LONGLATI, (x,y) are (theta, phi) angles
-                double x = K_inv(0,0) * i + K_inv(0,1) * j + K_inv(0,2);
-                double y = K_inv(1,0) * i + K_inv(1,1) * j + K_inv(1,2);
-                if (flag == omnidir::RECTIFY_LONGLATI)
+                Vec3d point;
+                double depth = realDepthMap.at<double>(j, i);
+                if (depth > 0 )
                 {
-                    point = Vec3d(-std::cos(x), -std::sin(x)*std::cos(y), std::sin(x)*std::sin(y));
-                    point = point * depth;
+                    // for RECTIFY_PERSPECTIVE, (x,y) are image plane points,
+                    // for RECTIFY_LONGLATI, (x,y) are (theta, phi) angles
+                    double x = K_inv(0,0) * i + K_inv(0,1) * j + K_inv(0,2);
+                    double y = K_inv(1,0) * i + K_inv(1,1) * j + K_inv(1,2);
+                    if (flag == omnidir::RECTIFY_LONGLATI)
+                    {
+                        point = Vec3d(-std::cos(x), -std::sin(x)*std::cos(y), std::sin(x)*std::sin(y));
+                        point = point * depth;
+                    }
+                    else if(flag == omnidir::RECTIFY_PERSPECTIVE)
+                    {
+                        point[0] = x;
+                        point[1] = y;
+                        point[2] = 1.0;
+                        point = point * depth;
+                    }
+                    _pointCloud.push_back(point);
                 }
-                else if(flag == omnidir::RECTIFY_PERSPECTIVE)
-                {
-                    point[0] = x;
-                    point[1] = y;
-                    point[2] = 1.0;
-                    point = point * depth;
-                }
-                _pointCloud.push_back(point);
             }
         }
+        int nPoints = (int)_pointCloud.size();
+        pointCloud.create(1, nPoints, CV_64FC3);
+        Mat(_pointCloud).convertTo(pointCloud.getMat(), CV_64FC3);
     }
-    int nPoints = (int)_pointCloud.size();
-    pointCloud.create(1, nPoints, CV_64FC3);
-    Mat(_pointCloud).convertTo(pointCloud.getMat(), CV_64FC3);
 }
 
 void cv::omnidir::internal::encodeParameters(InputArray K, InputArrayOfArrays omAll, InputArrayOfArrays tAll, InputArray distoaration, double xi, OutputArray parameters)
@@ -1449,7 +1480,7 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
         0,    0,  1);
     _D  = Matx14d(para[6*n+6], para[6*n+7], para[6*n+8], para[6*n+9]);
     xi = para[6*n+5];
-    vector<Vec3d> _omAll(n), _tAll(n);
+    std::vector<Vec3d> _omAll(n), _tAll(n);
     for (int i = 0; i < n; i++)
     {
         _omAll[i] = Vec3d(param.colRange(i*6, i*6+3));
@@ -1499,7 +1530,7 @@ void cv::omnidir::internal::encodeParametersStereo(InputArray K1, InputArray K2,
     Mat param = parameters.getMat().reshape(1, 1);
     param.colRange(0, 3).reshape(1, 3).copyTo(om.getMat());
     param.colRange(3, 6).reshape(1, 3).copyTo(T.getMat());
-    vector<Vec3d> _omL, _tL;
+    std::vector<Vec3d> _omL, _tL;
 
     for(int i = 0; i < n; i++)
     {
@@ -1563,8 +1594,13 @@ void cv::omnidir::internal::estimateUncertainties(InputArrayOfArrays objectPoint
 
     for(int i=0; i < n; ++i)
     {
-        Mat imgPoints = imagePoints.getMat(i);
-        Mat objPoints = objectPoints.getMat(i);
+        //Mat imgPoints = imagePoints.getMat(i);
+        //Mat objPoints = objectPoints.getMat(i);
+		Mat imgPoints, objPoints;
+		imagePoints.getMat(i).copyTo(imgPoints);
+		objectPoints.getMat(i).copyTo(objPoints);
+		imgPoints = imgPoints.reshape(2, imgPoints.rows*imgPoints.cols);
+		objPoints = objPoints.reshape(3, objPoints.rows*objPoints.cols);
 
         Mat om = parameters.getMat().colRange(i*6, i*6+3);
         Mat T = parameters.getMat().colRange(i*6+3, (i+1)*6);
@@ -1617,7 +1653,7 @@ void cv::omnidir::internal::estimateUncertaintiesStereo(InputArrayOfArrays objec
 
     Mat _K1, _K2, _D1, _D2;
     Vec3d _om, _T;
-    vector<Vec3d> _omL(n_img), _tL(n_img);
+    std::vector<Vec3d> _omL(n_img), _tL(n_img);
     Mat _parameters = parameters.getMat().reshape(1, 1);
     double _xi1, _xi2;
     internal::decodeParametersStereo(_parameters, _K1, _K2, _om, _T, _omL, _tL, _D1, _D2, _xi1, _xi2);
@@ -1628,8 +1664,13 @@ void cv::omnidir::internal::estimateUncertaintiesStereo(InputArrayOfArrays objec
     // error for left image
     for (int i = 0; i < n_img; ++i)
     {
-        Mat objPointsi = objectPoints.getMat(i);
-        Mat imgPointsi = imagePoints1.getMat(i);
+        //Mat objPointsi = objectPoints.getMat(i);
+        //Mat imgPointsi = imagePoints1.getMat(i);
+        Mat objPointsi, imgPointsi;
+        objectPoints.getMat(i).copyTo(objPointsi);
+        imagePoints1.getMat(i).copyTo(imgPointsi);
+        objPointsi = objPointsi.reshape(3, objPointsi.rows*objPointsi.cols);
+        imgPointsi = imgPointsi.reshape(2, imgPointsi.rows*imgPointsi.cols);
 
         Mat x;
         omnidir::projectPoints(objPointsi, x, _omL[i], _tL[i], _K1, _xi1, _D1, cv::noArray());
@@ -1641,8 +1682,13 @@ void cv::omnidir::internal::estimateUncertaintiesStereo(InputArrayOfArrays objec
     // error for right image
     for (int i = 0; i < n_img; ++i)
     {
-        Mat objPointsi = objectPoints.getMat(i);
-        Mat imgPointsi = imagePoints2.getMat(i);
+        //Mat objPointsi = objectPoints.getMat(i);
+        //Mat imgPointsi = imagePoints2.getMat(i);
+        Mat objPointsi, imgPointsi;
+        objectPoints.getMat(i).copyTo(objPointsi);
+        imagePoints2.getMat(i).copyTo(imgPointsi);
+        objPointsi = objPointsi.reshape(3, objPointsi.rows*objPointsi.cols);
+        imgPointsi = imgPointsi.reshape(2, imgPointsi.rows*imgPointsi.cols);
 
         Mat x;
         Mat _R, _R2, _R1, _T2, _T1, _om2;
@@ -1699,7 +1745,11 @@ double cv::omnidir::internal::computeMeanReproErr(InputArrayOfArrays imagePoints
     {
         for (int i = 0; i < n; i++)
         {
-            Mat errorI = imagePoints.getMat(i) - proImagePoints.getMat(i);
+			Mat x, proj_x;
+			imagePoints.getMat(i).copyTo(x);
+			proImagePoints.getMat(i).copyTo(proj_x);
+			Mat errorI = x.reshape(2, x.rows*x.cols) - proj_x.reshape(2, proj_x.rows*proj_x.cols);
+            //Mat errorI = imagePoints.getMat(i) - proImagePoints.getMat(i);
             totalPoints += (int)errorI.total();
             Vec2d* ptr_err = errorI.ptr<Vec2d>();
             for (int j = 0; j < (int)errorI.total(); j++)
@@ -1710,7 +1760,11 @@ double cv::omnidir::internal::computeMeanReproErr(InputArrayOfArrays imagePoints
     }
     else
     {
-        Mat errorI = imagePoints.getMat() - proImagePoints.getMat();
+		Mat x, proj_x;
+		imagePoints.getMat().copyTo(x);
+		proImagePoints.getMat().copyTo(proj_x);
+		Mat errorI = x.reshape(2, x.rows*x.cols) - proj_x.reshape(2, proj_x.rows*proj_x.cols);
+        //Mat errorI = imagePoints.getMat() - proImagePoints.getMat();
         totalPoints += (int)errorI.total();
         Vec2d* ptr_err = errorI.ptr<Vec2d>();
         for (int j = 0; j < (int)errorI.total(); j++)
@@ -1865,7 +1919,7 @@ void cv::omnidir::internal::subMatrix(const Mat& src, Mat& dst, const std::vecto
 
 void cv::omnidir::internal::flags2idx(int flags, std::vector<int>& idx, int n)
 {
-    idx = vector<int>(6*n+10,1);
+    idx = std::vector<int>(6*n+10,1);
     int _flags = flags;
     if(_flags >= omnidir::CALIB_FIX_CENTER)
     {
@@ -1912,7 +1966,7 @@ void cv::omnidir::internal::flags2idx(int flags, std::vector<int>& idx, int n)
 
 void cv::omnidir::internal::flags2idxStereo(int flags, std::vector<int>& idx, int n)
 {
-    idx = vector<int>(6*(n+1)+20, 1);
+    idx = std::vector<int>(6*(n+1)+20, 1);
     int _flags = flags;
     int offset1 = 6*(n+1);
     int offset2 = offset1 + 10;
@@ -2073,7 +2127,8 @@ void cv::omnidir::stereoRectify(InputArray K1, InputArray D1, double xi1, InputA
     }
 }
 
-void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2)
+void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2,
+    OutputArray inter_ori)
 {
     Mat _idx1 = idx1.getMat();
     Mat _idx2 = idx2.getMat();
@@ -2081,7 +2136,7 @@ void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, Output
     int n1 = (int)idx1.total();
     int n2 = (int)idx2.total();
 
-    vector<int> _inter1, _inter2;
+    std::vector<int> _inter1, _inter2, _inter_ori;
     for (int i = 0; i < n1; ++i)
     {
         for (int j = 0; j < n2; ++j)
@@ -2090,12 +2145,14 @@ void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, Output
             {
                 _inter1.push_back(i);
                 _inter2.push_back(j);
+                _inter_ori.push_back(_idx1.at<int>(i));
             }
         }
     }
 
     inter1.create(1, (int)_inter1.size(), CV_32S);
     inter2.create(1, (int)_inter2.size(), CV_32S);
+    inter_ori.create(1, (int)_inter_ori.size(), CV_32S);
 
     for (int i = 0; i < (int)_inter1.size(); ++i)
     {
@@ -2104,5 +2161,9 @@ void cv::omnidir::internal::getInterset(InputArray idx1, InputArray idx2, Output
     for (int i = 0; i < (int)_inter2.size(); ++i)
     {
         inter2.getMat().at<int>(i) = _inter2[i];
+    }
+    for (int i = 0; i < (int)_inter_ori.size(); ++i)
+    {
+        inter_ori.getMat().at<int>(i) = _inter_ori[i];
     }
 }

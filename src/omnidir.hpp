@@ -182,7 +182,7 @@ namespace omnidir
     */
     CV_EXPORTS_W double stereoCalibrate(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
         Size imageSize, InputOutputArray K1, InputOutputArray xi1, InputOutputArray D1, InputOutputArray K2, InputOutputArray xi2,
-        InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria);
+        InputOutputArray D2, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, int flags, TermCriteria criteria, OutputArray idx=noArray());
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
 
@@ -232,7 +232,7 @@ namespace internal
         OutputArrayOfArrays tAll, OutputArray K, double& xi, OutputArray idx = noArray());
     void initializeStereoCalibration(InputOutputArrayOfArrays objectPoints, InputOutputArrayOfArrays imagePoints1, InputOutputArrayOfArrays imagePoints2,
         Size size, OutputArray om, OutputArray T, OutputArrayOfArrays omL, OutputArrayOfArrays tL, OutputArray K1, OutputArray D1, OutputArray K2, OutputArray D2,
-        double &xi1, double &xi2, int flags);
+        double &xi1, double &xi2, int flags, OutputArray idx);
     void computeJacobian(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints, InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
     void computeJacobianStereo(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2,
         InputArray parameters, Mat& JTJ_inv, Mat& JTE, int flags);
@@ -258,7 +258,7 @@ namespace internal
     void fillFixedStereo(Mat& G, int flags, int n);
     double findMedian(const Mat& row);
     Vec3d findMedian3(InputArray mat);
-    void getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2);
+    void getInterset(InputArray idx1, InputArray idx2, OutputArray inter1, OutputArray inter2, OutputArray inter_ori);
     void compose_motion(InputArray _om1, InputArray _T1, InputArray _om2, InputArray _T2, Mat& om3, Mat& T3, Mat& dom3dom1,
         Mat& dom3dT1, Mat& dom3dom2, Mat& dom3dT2, Mat& dT3dom1, Mat& dT3dT1, Mat& dT3dom2, Mat& dT3dT2);
     void JRodriguesMatlab(const Mat& src, Mat& dst);
