@@ -162,5 +162,5 @@ int main(int argc, char** argv)
     Mat D;
     vector<Mat> rvec, tvec;
     double rms = calibrateCamera(objectPoints, imagePoints, vecImg[0].size(), K, D, rvec, tvec);
-    saveCameraParams("camera_params.xml", vecImg[0].size(), 20.3, 28.5, flags, K, D, rvec, tvec, rms);
+    saveCameraParams("camera_params.xml", vecImg[0].size(), patternWidth, patternHeight, flags, K, D, rvec, tvec, rms);
 }

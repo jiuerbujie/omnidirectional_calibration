@@ -117,7 +117,7 @@ public:
     @param imageWidth image width of the generated pattern image
     @param imageHeight image height of the generated pattern image
     */
-    randomPatternGenerator(int imageWidth, double imageHeight);
+    randomPatternGenerator(int imageWidth, int imageHeight);
 
     /* @brief Generate pattern
     */
@@ -126,7 +126,8 @@ public:
     */
     cv::Mat getPattern();
 private:
-    cv::Mat pattern;
+    cv::Mat _pattern;
+    int _imageWidth, _imageHeight;
 };
 
 

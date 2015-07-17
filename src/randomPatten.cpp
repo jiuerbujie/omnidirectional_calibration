@@ -135,7 +135,7 @@ void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> in
         // draw filtered correspondence
         //drawCorrespondence(inputImages[i], keypointsImage, patternImage, keypointsPattern, matchesImgtoPat,
         //    innerMask1, innerMask2);
-        if(keypointsImageLocation.total() > _nminiMatch)
+        if((int)keypointsImageLocation.total() > _nminiMatch)
         {
             getObjectImagePoints(keypointsImageLocation, keypointsPatternLocation, i);
         } 
@@ -285,4 +285,46 @@ std::vector<cv::Mat> randomPatternCornerFinder::getObjectPoints()
 std::vector<cv::Mat> randomPatternCornerFinder::getImagePoints()
 {
     return _imagePoints;
+}
+
+randomPatternGenerator::randomPatternGenerator(int imageWidth, int imageHeight)
+{
+    _imageWidth = imageWidth;
+    _imageHeight = imageHeight;
+}
+
+void randomPatternGenerator::generatePattern()
+{
+    Mat pattern = Mat(_imageHeight, _imageWidth, CV_32F, Scalar(0.));
+
+    int m = 5;
+    int count = 0;
+
+    while(m < _imageWidth)
+    {
+        int n = (int)std::floor(double(_imageHeight) / double(_imageWidth) * double(m)) + 1;
+
+        Mat r = Mat(n, m, CV_32F);
+        cv::randn(r, Scalar::all(0), Scalar::all(1));
+        cv::resize(r, r, Size(_imageWidth ,_imageHeight));
+        double min_r, max_r;
+        minMaxLoc(r, &min_r, &max_r);
+
+        r = (r - (float)min_r) / float(max_r - min_r);
+
+        pattern += r;
+        count += 1;
+        m *= 2;
+    }
+    std::cout << pattern.at<float>(0,1) << std::endl;
+    pattern = pattern / count * 255;
+    pattern.convertTo(pattern, CV_8U);
+    std::cout << pattern.at<uchar>(0,1) << std::endl;
+    equalizeHist(pattern, pattern);
+    pattern.copyTo(_pattern);
+}
+
+cv::Mat randomPatternGenerator::getPattern()
+{
+    return _pattern;
 }
