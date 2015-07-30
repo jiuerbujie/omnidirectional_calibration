@@ -240,7 +240,7 @@ TEST_F(omnidirTest, jacobian)
 TEST_F(omnidirTest, calibration)
 {
     // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("corners_fisheye2_right.xml", cv::FileStorage::READ);
+    cv::FileStorage fs("corners_zhixuan.xml", cv::FileStorage::READ);
     std::vector<cv::Mat> v_patternPoints, v_imagePoints;
     cv::Size imgSize;
     fs["objectPoints"] >> v_patternPoints;
@@ -255,7 +255,8 @@ TEST_F(omnidirTest, calibration)
         pattern_input.push_back(v_patternPoints[i]);
         image_input.push_back(v_imagePoints[i]);
     }
-    cv::Mat K, D, omAll, tAll;
+    cv::Mat K, D;
+    std::vector<cv::Vec3d> omAll,tAll;
     cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
     cv::Vec<double, 1> xi ;
     int flag = cv::omnidir::CALIB_FIX_SKEW;
@@ -337,30 +338,34 @@ TEST_F(omnidirTest, calibration)
 //    cv::imwrite("stereo_pair_000_r_log_rec.jpg", unDis2);
 //}
 
-TEST_F(omnidirTest, stereoRecons)
-{
-    cv::FileStorage fs("corners_fisheye2.xml", cv::FileStorage::READ);
-    cv::Mat K1, K2, D1, D2;
-    double xi1, xi2;
-    cv::Vec3d om, T;
-    fs["K1"] >> K1;
-    fs["D1"] >> D1;
-    fs["xi1"] >> xi1;
-    fs["K2"] >> K2;
-    fs["D2"] >> D2;
-    fs["xi2"] >> xi2;
-    fs["om"] >> om;
-    fs["T"] >> T;
-    cv::Mat img1, img2;
-    img1 = cv::imread("recons_L.bmp", cv::IMREAD_GRAYSCALE);
-    img2 = cv::imread("recons_R.bmp", cv::IMREAD_GRAYSCALE);
-    int numDisparities = 16*5;
-    int SADWindowSize = 5;
-    cv::Mat depthMap;
-    int flag = cv::omnidir::RECTIFY_LONGLATI;
-    cv::omnidir::stereoReconstruct(img1, img2, K1, D1, xi1, K2, D2, xi2, om, T, flag,
-        numDisparities, SADWindowSize, depthMap, cv::noArray());
-}
+//TEST_F(omnidirTest, stereoRecons)
+//{
+//    cv::FileStorage fs("fisheye_pair2_result.xml", cv::FileStorage::READ);
+//    cv::Mat K1, K2, D1, D2;
+//    double xi1, xi2;
+//    cv::Vec3d om, T;
+//    fs["K1"] >> K1;
+//    fs["D1"] >> D1;
+//    fs["xi1"] >> xi1;
+//    fs["K2"] >> K2;
+//    fs["D2"] >> D2;
+//    fs["xi2"] >> xi2;
+//    fs["om"] >> om;
+//    fs["T"] >> T;
+//    cv::Mat img1, img2;
+//    img1 = cv::imread("recons_L.bmp", cv::IMREAD_GRAYSCALE);
+//    img2 = cv::imread("recons_R.bmp", cv::IMREAD_GRAYSCALE);
+//    cv::Size imgSize = img1.size();
+//    int numDisparities = 16*5;
+//    int SADWindowSize = 5;
+//    cv::Mat depthMap;
+//    int flag = cv::omnidir::RECTIFY_LONGLATI;
+//    // the range of theta is (0, pi) and the range of phi is (0, pi)
+//    cv::Matx33d KNew(imgSize.width / 3.1415, 0, 0, 0, imgSize.height / 3.1415, 0, 0, 0, 1);
+//    cv::omnidir::stereoReconstruct(img1, img2, K1, D1, xi1, K2, D2, xi2, om, T, flag,
+//        numDisparities, SADWindowSize, depthMap, cv::noArray(), imgSize, KNew);
+//    cv::imwrite("depthmap.png", depthMap);
+//}
 
 const cv::Size omnidirTest::imageSize(1280, 800);
 

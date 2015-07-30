@@ -58,7 +58,8 @@
 using namespace cv;
 using namespace std;
 randomPatternCornerFinder::randomPatternCornerFinder(double patternWidth, double patternHeight, int nfeatures,
-    int nminiMatch, int depth)
+    int nminiMatch, int depth, Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
+    Ptr<DescriptorMatcher> matcher)
 {
     _patternHeight = patternHeight;
     _patternWidth = patternWidth;
@@ -67,6 +68,9 @@ randomPatternCornerFinder::randomPatternCornerFinder(double patternWidth, double
     _objectPonits.resize(0);
     _imagePoints.resize(0);
     _depth = depth;
+    _detector = detector;
+    _descriptor = descriptor;
+    _matcher = matcher;
 }
 
 void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> inputImages, cv::Mat patternImage)
@@ -76,21 +80,22 @@ void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> in
     _patternImageSize = patternImage.size();
 
     int nImag = (int)inputImages.size();
-    Ptr<ORB> detector = ORB::create(_nfeatures);
+    //Ptr<BRISK> detector = BRISK::create();
     //Ptr<BRISK> detector = BRISK::create(100);
-
+    //Ptr<AKAZE> detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.005);
+    
     // key points detection and description for pattern
     Mat descriptorPattern;
     std::vector<cv::KeyPoint> keypointsPattern;
     Mat keypointsPatternLocation;
     
-    detector->detect(patternImage, keypointsPattern);
-    detector->compute(patternImage, keypointsPattern, descriptorPattern);
+    this->_detector->detect(patternImage, keypointsPattern);
+    this->_descriptor->compute(patternImage, keypointsPattern, descriptorPattern);
 
     // only CV_32F type is support for match
     descriptorPattern.convertTo(descriptorPattern, CV_32F);
 
-    Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-L1");
+    //Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-L1");
     for (int i = 0; i < nImag; ++i)
     {
         CV_Assert(inputImages[i].type() == CV_8UC1);
@@ -102,8 +107,8 @@ void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> in
 
         //equalizeHist(inputImages[i], inputImages[i]);
 
-        detector->detect(inputImages[i], keypointsImage);
-        detector->compute(inputImages[i], keypointsImage, descriptorImage);
+        _detector->detect(inputImages[i], keypointsImage);
+        _descriptor->compute(inputImages[i], keypointsImage, descriptorImage);
         // only CV_32F type is support for match
         descriptorImage.convertTo(descriptorImage, CV_32F);
 
@@ -111,7 +116,7 @@ void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> in
         std::vector<DMatch> matchesImgtoPat; 
         
         //matcher->match(descriptorImage, descriptorPattern, matchesImgtoPat);
-        crossCheckMatching(matcher, descriptorImage, descriptorPattern, matchesImgtoPat);
+        crossCheckMatching(this->_matcher, descriptorImage, descriptorPattern, matchesImgtoPat, 5);
         keyPoints2MatchedLocation(keypointsImage, keypointsPattern, matchesImgtoPat,
             keypointsImageLocation, keypointsPatternLocation);
 
@@ -121,23 +126,23 @@ void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> in
         Mat innerMask1, innerMask2;
 
         // draw raw correspondence
-        //drawCorrespondence(inputImages[i], keypointsImage, patternImage, keypointsPattern, matchesImgtoPat,
-        //    innerMask1, innerMask2);
+        drawCorrespondence(inputImages[i], keypointsImage, patternImage, keypointsPattern, matchesImgtoPat,
+            innerMask1, innerMask2);
 
         // outlier remove
         findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
-            FM_7POINT, 1, 0.995, innerMask1);
+            FM_7POINT, 1, 0.99, innerMask1);
         getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
 
         findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 3, innerMask2);
         getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
         // draw filtered correspondence
-        //drawCorrespondence(inputImages[i], keypointsImage, patternImage, keypointsPattern, matchesImgtoPat,
-        //    innerMask1, innerMask2);
+        drawCorrespondence(inputImages[i], keypointsImage, patternImage, keypointsPattern, matchesImgtoPat,
+            innerMask1, innerMask2);
         if((int)keypointsImageLocation.total() > _nminiMatch)
         {
-            getObjectImagePoints(keypointsImageLocation, keypointsPatternLocation, i);
+            getObjectImagePoints(keypointsImageLocation, keypointsPatternLocation);
         } 
     }
 }
@@ -180,7 +185,7 @@ void randomPatternCornerFinder::getFilteredLocation(cv::Mat& imageKeypoints, cv:
     Mat(vecPattern).convertTo(patternKeypoints, CV_64FC2);
 }
 
-void randomPatternCornerFinder::getObjectImagePoints(const cv::Mat& imageKeypoints, const cv::Mat& patternKeypoints, int i)
+void randomPatternCornerFinder::getObjectImagePoints(const cv::Mat& imageKeypoints, const cv::Mat& patternKeypoints)
 {
     Mat imagePoints_i, objectPoints_i;
     int imagePointsType = CV_MAKETYPE(_depth, 2);
@@ -285,6 +290,99 @@ std::vector<cv::Mat> randomPatternCornerFinder::getObjectPoints()
 std::vector<cv::Mat> randomPatternCornerFinder::getImagePoints()
 {
     return _imagePoints;
+}
+
+void randomPatternCornerFinder::loadPattern(cv::Mat patternImage)
+{
+    _patternImage = patternImage.clone();
+    if (_patternImage.type()!= CV_8U)
+        _patternImage.convertTo(_patternImage, CV_8U);
+    _patternImageSize = _patternImage.size();
+    _detector->detect(patternImage, _keypointsPattern);
+    _descriptor->compute(patternImage, _keypointsPattern, _descriptorPattern);
+    _descriptorPattern.convertTo(_descriptorPattern, CV_32F);
+}
+
+std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingle(cv::Mat inputImage)
+{
+    std::vector<cv::Mat> r(2);
+    Mat descriptorImage1, descriptorImage2,descriptorImage;
+    std::vector<cv::KeyPoint> keypointsImage1, keypointsImage2, keypointsImage;
+    if (inputImage.type()!=CV_8U)
+    {
+        inputImage.convertTo(inputImage, CV_8U);
+    }
+
+    Mat imageEquHist;
+    equalizeHist(inputImage, imageEquHist);
+
+    _detector->detect(inputImage, keypointsImage1);
+    _descriptor->compute(inputImage, keypointsImage1, descriptorImage1);
+    _detector->detect(imageEquHist, keypointsImage2);
+    _descriptor->compute(imageEquHist, keypointsImage2, descriptorImage2);
+    descriptorImage1.convertTo(descriptorImage1, CV_32F);
+    descriptorImage2.convertTo(descriptorImage2, CV_32F);
+
+    // match with pattern
+    std::vector<DMatch> matchesImgtoPat, matchesImgtoPat1, matchesImgtoPat2;
+
+    cv::Mat keypointsImageLocation, keypointsPatternLocation;
+
+    crossCheckMatching(this->_matcher, descriptorImage1, this->_descriptorPattern, matchesImgtoPat1, 2);
+    crossCheckMatching(this->_matcher, descriptorImage2, this->_descriptorPattern, matchesImgtoPat2, 2);
+    if ((int)matchesImgtoPat1.size() > (int)matchesImgtoPat2.size())
+    {
+        matchesImgtoPat = matchesImgtoPat1;
+        keypointsImage = keypointsImage1;
+    }
+    else
+    {
+        matchesImgtoPat = matchesImgtoPat2;
+        keypointsImage = keypointsImage2;
+    }
+
+    keyPoints2MatchedLocation(keypointsImage, this->_keypointsPattern, matchesImgtoPat,
+        keypointsImageLocation, keypointsPatternLocation);
+
+    Mat img_corr;
+
+    // innerMask is CV_8U type
+    Mat innerMask1, innerMask2;
+
+    // draw raw correspondence
+    //drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+    //    innerMask1, innerMask2);
+
+    // outlier remove
+    findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
+        FM_RANSAC, 1, 0.995, innerMask1);
+    getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
+
+    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 2, innerMask2);
+    getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
+
+    // draw filtered correspondence
+    //drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+    //    innerMask1, innerMask2);
+
+    std::vector<Vec3d> objectPoints;
+
+    int imagePointsType = CV_MAKETYPE(_depth, 2);
+    int objectPointsType = CV_MAKETYPE(_depth, 3);
+
+    
+    keypointsImageLocation.convertTo(r[0], imagePointsType);
+
+    for (int i = 0; i < (int)keypointsPatternLocation.total(); ++i)
+    {
+        double x = keypointsPatternLocation.at<Vec2d>(i)[0];
+        double y = keypointsPatternLocation.at<Vec2d>(i)[1];
+        x = x / _patternImageSize.width * _patternWidth;
+        y = y / _patternImageSize.height * _patternHeight;
+        objectPoints.push_back(Vec3d(x, y, 0));
+    }
+    Mat(objectPoints).convertTo(r[1], objectPointsType);
+    return r;
 }
 
 randomPatternGenerator::randomPatternGenerator(int imageWidth, int imageHeight)
