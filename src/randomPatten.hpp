@@ -65,7 +65,7 @@ public:
     @param nfeatures nunber of ORB keypoints, see ORB::ORB() for detail
     @param nMiniMatch number of minimal matches, otherwise that image is abandoned
     */
-    randomPatternCornerFinder(double patternWidth, double patternHeight, int nfeatures,
+    randomPatternCornerFinder(float patternWidth, float patternHeight, int nfeatures,
         int nminiMatch, int depth, Ptr<FeatureDetector> detector,
         Ptr<DescriptorExtractor> descriptor, Ptr<DescriptorMatcher> matcher);
 
@@ -98,7 +98,7 @@ public:
 
 private:
     std::vector<cv::Mat> _objectPonits, _imagePoints;
-    double _patternWidth, _patternHeight;
+    float _patternWidth, _patternHeight;
     cv::Size _patternImageSize;
     int _nminiMatch, _nfeatures;
     int _depth;

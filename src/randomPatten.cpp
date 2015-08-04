@@ -57,7 +57,7 @@
 #include <iostream>
 using namespace cv;
 using namespace std;
-randomPatternCornerFinder::randomPatternCornerFinder(double patternWidth, double patternHeight, int nfeatures,
+randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float patternHeight, int nfeatures,
     int nminiMatch, int depth, Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
     Ptr<DescriptorMatcher> matcher)
 {
@@ -350,20 +350,20 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
     Mat innerMask1, innerMask2;
 
     // draw raw correspondence
-    //drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
-    //    innerMask1, innerMask2);
+    /*drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+        innerMask1, innerMask2);*/
 
     // outlier remove
     findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
-        FM_RANSAC, 1, 0.995, innerMask1);
+        FM_7POINT, 1, 0.99, innerMask1);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
 
-    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 2, innerMask2);
+    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 3, innerMask2);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
     // draw filtered correspondence
-    //drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
-    //    innerMask1, innerMask2);
+    /*drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+    innerMask1, innerMask2);*/
 
     std::vector<Vec3d> objectPoints;
 

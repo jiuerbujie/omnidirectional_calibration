@@ -79,26 +79,43 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
                 InputArray rvec, InputArray tvec, InputArray K, double xi, InputArray D, OutputArray jacobian)
 {
 
-    CV_Assert(objectPoints.type() == CV_64FC3);
-    CV_Assert(rvec.type() == CV_64F && rvec.total() == 3);
-    CV_Assert(tvec.type() == CV_64F && tvec.total() == 3);
-    CV_Assert(K.type() == CV_64F && K.size() == Size(3,3));
-    CV_Assert(D.type() == CV_64F && D.total() == 4);
-    // each row is an image point
+    CV_Assert(objectPoints.type() == CV_64FC3 || objectPoints.type() == CV_32FC3);
+    CV_Assert((rvec.depth() == CV_64F || rvec.depth() == CV_32F) && rvec.total() == 3);
+    CV_Assert((tvec.depth() == CV_64F || tvec.depth() == CV_32F) && tvec.total() == 3);
+    CV_Assert((K.type() == CV_64F || K.type() == CV_32F) && K.size() == Size(3,3));
+    CV_Assert((D.type() == CV_64F || D.type() == CV_32F) && D.total() == 4);
+    
     imagePoints.create(objectPoints.size(), CV_MAKETYPE(objectPoints.depth(), 2));
+
     int n = (int)objectPoints.total();
-    Vec3d om = *rvec.getMat().ptr<Vec3d>();
-    Vec3d T  = *tvec.getMat().ptr<Vec3d>();
-    Matx33d Kc = K.getMat();
-    Vec<double, 4> kp= (Vec<double,4>)*D.getMat().ptr<Vec<double,4> >();
+
+    Vec3d om = rvec.depth() == CV_32F ? (Vec3d)*rvec.getMat().ptr<Vec3f>() : *rvec.getMat().ptr<Vec3d>();
+    Vec3d T  = tvec.depth() == CV_32F ? (Vec3d)*tvec.getMat().ptr<Vec3f>() : *tvec.getMat().ptr<Vec3d>();
 
     Vec2d f,c;
+    double s;
+    if (K.depth() == CV_32F)
+    {
+        Matx33f Kc = K.getMat();
+        f = Vec2f(Kc(0,0), Kc(1,1));
+        c = Vec2f(Kc(0,2),Kc(1,2));
+        s = (double)Kc(0,1);
+    }
+    else
+    {
+        Matx33d Kc = K.getMat();
+        f = Vec2d(Kc(0,0), Kc(1,1));
+        c = Vec2d(Kc(0,2),Kc(1,2));
+        s = Kc(0,1);
+    }
+    
+    Vec4d kp = D.depth() == CV_32F ? (Vec4d)*D.getMat().ptr<Vec4f>() : *D.getMat().ptr<Vec4d>();
+    //Vec<double, 4> kp= (Vec<double,4>)*D.getMat().ptr<Vec<double,4> >();
 
-    f = Vec2d(Kc(0,0),Kc(1,1));
-    c = Vec2d(Kc(0,2),Kc(1,2));
-    double s = Kc(0,1);
-    const Vec3d* Xw_all = objectPoints.getMat().ptr<Vec3d>();
+    const Vec3d* Xw_alld = objectPoints.getMat().ptr<Vec3d>();
+    const Vec3f* Xw_allf = objectPoints.getMat().ptr<Vec3f>();
     Vec2d* xpd = imagePoints.getMat().ptr<Vec2d>();
+    Vec2f* xpf = imagePoints.getMat().ptr<Vec2f>();
 
     Matx33d R;
     Matx<double, 3, 9> dRdom;
@@ -118,7 +135,7 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
     for (int i = 0; i < n; i++)
     {
         // convert to camera coordinate
-        Vec3d Xw = (Vec3d)Xw_all[i];
+        Vec3d Xw = objectPoints.depth() == CV_32F ? (Vec3d)Xw_allf[i] : Xw_alld[i];
 
         Vec3d Xc = (Vec3d)(R*Xw + T);
 
@@ -137,8 +154,20 @@ void cv::omnidir::projectPoints(InputArray objectPoints, OutputArray imagePoints
         xd[1] = xu[1]*(1+k1*r2+k2*r4) + p1*(r2+2*xu[1]*xu[1]) + 2*p2*xu[0]*xu[1];
 
         // convert to pixel coordinate
-        xpd[i][0] = f[0]*xd[0]+s*xd[1]+c[0];
-        xpd[i][1] = f[1]*xd[1]+c[1];
+        Vec2d final;
+        final[0] = f[0]*xd[0]+s*xd[1]+c[0];
+        final[1] = f[1]*xd[1]+c[1];
+
+        if (objectPoints.depth() == CV_32F)
+        {
+            xpf[i] = final;
+        }
+        else
+        {
+            xpd[i] = final;
+        }
+        /*xpd[i][0] = f[0]*xd[0]+s*xd[1]+c[0];
+        xpd[i][1] = f[1]*xd[1]+c[1];*/
 
         if (jacobian.needed())
         {
@@ -1106,12 +1135,13 @@ void cv::omnidir::internal::dAB(InputArray A, InputArray B, OutputArray dABdA, O
     }
 }
 
-double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size,
+double cv::omnidir::calibrate(InputArray patternPoints, InputArray imagePoints, Size size,
     InputOutputArray K, InputOutputArray xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
     int flags, TermCriteria criteria, OutputArray idx)
 {
     CV_Assert(!patternPoints.empty() && !imagePoints.empty() && patternPoints.total() == imagePoints.total());
-    //CV_Assert(patternPoints.type() == CV_64FC3 && imagePoints.type() == CV_64FC2);
+    CV_Assert((patternPoints.type() == CV_64FC3 && imagePoints.type() == CV_64FC2) ||
+        (patternPoints.type() == CV_32FC3 && imagePoints.type() == CV_32FC2));
     CV_Assert(patternPoints.getMat(0).channels() == 3 && imagePoints.getMat(0).channels() == 2);
     CV_Assert((!K.empty() && K.size() == Size(3,3)) || K.empty());
     CV_Assert((!D.empty() && D.total() == 4) || D.empty());
@@ -1138,17 +1168,18 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
     std::vector<Vec3d> _omAll, _tAll;
     Matx33d _K;
     Matx14d _D;
-    cv::omnidir::internal::initializeCalibration(_patternPoints, _imagePoints, size, _omAll, _tAll, _K, _xi, idx);
+    Mat _idx;
+    cv::omnidir::internal::initializeCalibration(_patternPoints, _imagePoints, size, _omAll, _tAll, _K, _xi, _idx);
     std::vector<Mat> _patternPointsTmp = _patternPoints;
     std::vector<Mat> _imagePointsTmp = _imagePoints;
 
     _patternPoints.clear();
     _imagePoints.clear();
     // erase 
-    for (int i = 0; i < (int)idx.total(); i++)
+    for (int i = 0; i < (int)_idx.total(); i++)
     {
-        _patternPoints.push_back(_patternPointsTmp[idx.getMat().at<int>(i)]);
-        _imagePoints.push_back(_imagePointsTmp[idx.getMat().at<int>(i)]);
+        _patternPoints.push_back(_patternPointsTmp[_idx.at<int>(i)]);
+        _imagePoints.push_back(_imagePointsTmp[_idx.at<int>(i)]);
     }
 
     int n = (int)_patternPoints.size();
@@ -1219,14 +1250,20 @@ double cv::omnidir::calibrate(InputOutputArrayOfArrays patternPoints, InputOutpu
         K.create(3, 3, CV_MAKETYPE(depth, 1));
         D.create(1, 4, CV_MAKETYPE(depth, 1));
     }
-    //Mat(_K).copyTo(K.getMat());
-    //Mat(_D).copyTo(D.getMat());
+
     Mat(_K).convertTo(K.getMat(), CV_MAKETYPE(depth, 1));
     Mat(_D).convertTo(D.getMat(), CV_MAKETYPE(depth, 1));
     xi.create(1, 1, CV_MAKETYPE(depth, 1));
     Mat xi_m = Mat(1, 1, CV_64F);
     xi_m.at<double>(0) = _xi;
     xi_m.convertTo(xi.getMat(), CV_MAKETYPE(depth, 1));
+
+    if (idx.needed())
+    {
+        idx.create(1, _idx.total(), CV_32S);
+        _idx.copyTo(idx.getMat());
+    }
+
     Vec2d std_error;
     double rms;
     Mat errors;

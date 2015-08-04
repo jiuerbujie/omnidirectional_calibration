@@ -51,6 +51,8 @@
 #include <iostream>
 using namespace cv;
 
+#define HEAD -1
+#define INVALID -2
 /** @brief Class for multiple camera calibration. It first calibrate each camera individually,
 then a bundle adjustment like optimization is applied to refine extrinsic parameters.
 Images that are used should be named by "cameraIdx-timestamp"
@@ -110,9 +112,12 @@ public:
     @fileName filename of string list that are used for calibration, the file is generated
     by imagelist_creator from OpenCv samples. The first one in the list is the pattern filename.
     */
-    multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName, double patternWidth,
-        double patternHeight, int nMiniMatches = 20, 
-        TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 200, 0.0001));
+    multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName, float patternWidth,
+        float patternHeight, int nMiniMatches = 20, 
+        TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 200, 0.0001),
+        Ptr<FeatureDetector> detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.002f),
+        Ptr<DescriptorExtractor> descriptor = AKAZE::create(AKAZE::DESCRIPTOR_MLDB,0, 3, 0.002f),
+        Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-L1"));
 
     /* @brief load images
     */
@@ -129,6 +134,10 @@ public:
     /* @brief run multi-camera camera calibration, it runs loadImage(), initialize() and optimizeExtrinsics()
     */
     double run();
+
+    /* @brief write camera parameters to file
+    */
+    void writeParameters(const std::string& filename);
 
 private:
     std::vector<std::string> readStringList();
@@ -150,9 +159,13 @@ private:
     int _camType;
     int _nCamera;
     int _nMiniMatches;
-    double _patternWidth, _patternHeight;
+    float _patternWidth, _patternHeight;
     TermCriteria _criteria;
     std::string _filename;
+    Ptr<FeatureDetector> _detector;
+    Ptr<DescriptorExtractor> _descriptor;
+    Ptr<DescriptorMatcher> _matcher;
+
     std::vector<edge> _edgeList;
     std::vector<vertex> _vertexList;
     std::vector<std::vector<cv::Mat> > _objectPointsForEachCamera;

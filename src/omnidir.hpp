@@ -155,7 +155,7 @@ namespace omnidir
     @param flags The flags that control calibrate
     @param criteria Termination criteria for optimization
     */
-    CV_EXPORTS_W double calibrate(InputOutputArrayOfArrays patternPoints, InputOutputArrayOfArrays imagePoints, Size size,
+    CV_EXPORTS_W double calibrate(InputArray patternPoints, InputArray imagePoints, Size size,
         InputOutputArray K, InputOutputArray xi, InputOutputArray D, OutputArrayOfArrays omAll, OutputArrayOfArrays tAll,
         int flags, TermCriteria criteria, OutputArray idx=noArray());
 
