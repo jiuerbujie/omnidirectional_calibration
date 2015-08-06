@@ -7,7 +7,7 @@
 using namespace cv;
 
 multiCameraCalibration::multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName,
-    float patternWidth, float patternHeight, int nMiniMatches, TermCriteria criteria,
+    float patternWidth, float patternHeight, int showExtration, int nMiniMatches, TermCriteria criteria,
     Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
     Ptr<DescriptorMatcher> matcher)
 {
@@ -18,6 +18,7 @@ multiCameraCalibration::multiCameraCalibration(int cameraType, int nCameras, con
     _patternWidth = patternWidth;
     _patternHeight = patternHeight;
     _criteria = criteria;
+    _showExtraction = showExtration;
     _objectPointsForEachCamera.resize(_nCamera);
     _imagePointsForEachCamera.resize(_nCamera);
     _cameraMatrix.resize(_nCamera);
@@ -28,6 +29,7 @@ multiCameraCalibration::multiCameraCalibration(int cameraType, int nCameras, con
     _detector = detector;
     _descriptor = descriptor;
     _matcher = matcher;
+
     for (int i = 0; i < _nCamera; ++i)
     {
         _vertexList.push_back(vertex());
@@ -71,7 +73,7 @@ void multiCameraCalibration::loadImages()
     Ptr<DescriptorExtractor> descriptor = _descriptor;
     Ptr<DescriptorMatcher> matcher = _matcher;
 
-    randomPatternCornerFinder finder(_patternWidth, _patternHeight, 500, 10, CV_32F, detector, descriptor, matcher);
+    randomPatternCornerFinder finder(_patternWidth, _patternHeight, 10, CV_32F, this->_showExtraction, detector, descriptor, matcher);
     Mat pattern = cv::imread(file_list[0]);
     finder.loadPattern(pattern);
 
@@ -120,7 +122,7 @@ void multiCameraCalibration::loadImages()
             rms = cv::calibrateCamera(_objectPointsForEachCamera[camera], _imagePointsForEachCamera[camera],
                 image.size(), _cameraMatrix[camera], _distortCoeffs[camera], _omEachCamera[camera],
                 _tEachCamera[camera]);
-            idx = Mat(1, (int)_omEachCamera[camera].total(), CV_32S);
+            idx = Mat(1, (int)_omEachCamera[camera].size(), CV_32S);
             for (int i = 0; i < (int)idx.total(); ++i)
             {
                 idx.at<int>(i) = i;
@@ -133,12 +135,14 @@ void multiCameraCalibration::loadImages()
                 _tEachCamera[camera], 0, TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 1e-7),
                 idx);
         }
+        _cameraMatrix[camera].convertTo(_cameraMatrix[camera], CV_32F);
+        _distortCoeffs[camera].convertTo(_distortCoeffs[camera], CV_32F);
         //else
         //{
         //    CV_Error_(CV_StsOutOfRange, "Unknown camera type, use PINHOLE or OMNIDIRECTIONAL");
         //}
-
-        for (int i = 0; i < (int)_omEachCamera[camera].total(); ++i)
+        
+        for (int i = 0; i < (int)_omEachCamera[camera].size(); ++i)
         {
             if ((int)_objectPointsForEachCamera[camera][idx.at<int>(i)].total() > _nMiniMatches)
             {
@@ -148,10 +152,19 @@ void multiCameraCalibration::loadImages()
 
                 photoVertex = this->getPhotoVertex(timestamp);
 
-                Mat transform = Mat::eye(4, 4, _omEachCamera[camera].depth());
+                if (_omEachCamera[camera][i].type()!=CV_32F)
+                {
+                    _omEachCamera[camera][i].convertTo(_omEachCamera[camera][i], CV_32F);
+                }
+                if (_tEachCamera[camera][i].type()!=CV_32F)
+                {
+                    _tEachCamera[camera][i].convertTo(_tEachCamera[camera][i], CV_32F);
+                }
+
+                Mat transform = Mat::eye(4, 4, CV_32F);
                 Mat R, T;
-                Rodrigues(_omEachCamera[camera].at<Vec3f>(i), R);
-                T = Mat(_tEachCamera[camera].at<Vec3f>(i)).reshape(1, 3);
+                Rodrigues(_omEachCamera[camera][i], R);
+                T = (_tEachCamera[camera][i]).reshape(1, 3);
                 R.copyTo(transform.rowRange(0, 3).colRange(0, 3));
                 T.copyTo(transform.rowRange(0, 3).col(3));
 
@@ -376,7 +389,12 @@ void multiCameraCalibration::computePhotoCameraJacobian(const Mat& rvecPhoto, co
     {
         tvecTran.convertTo(tvecTran, CV_32F);
     }
-    float _xi = xi.at<float>(0);
+    float _xi;
+    if (_camType == OMNIDIRECTIONAL)
+    {
+        _xi= xi.at<float>(0);
+    }
+    
     Mat imagePoints2, jacobian, dx_drvecCamera, dx_dtvecCamera, dx_drvecPhoto, dx_dtvecPhoto;
     if (_camType == PINHOLE)
     {
@@ -701,7 +719,11 @@ void multiCameraCalibration::writeParameters(const std::string& filename)
 
         fs << cameraMatrix << _cameraMatrix[camIdx];
         fs << cameraDistortion << _distortCoeffs[camIdx];
-        fs << cameraXi << _xi[camIdx].at<float>(0);
+        if (_camType == OMNIDIRECTIONAL)
+        {
+            fs << cameraXi << _xi[camIdx].at<float>(0);
+        }
+        
         fs << cameraPose << _vertexList[camIdx].pose;
     }
 

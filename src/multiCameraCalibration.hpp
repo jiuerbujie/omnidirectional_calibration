@@ -113,7 +113,7 @@ public:
     by imagelist_creator from OpenCv samples. The first one in the list is the pattern filename.
     */
     multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName, float patternWidth,
-        float patternHeight, int nMiniMatches = 20, 
+        float patternHeight, int showExtration = 0, int nMiniMatches = 20, 
         TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 200, 0.0001),
         Ptr<FeatureDetector> detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.002f),
         Ptr<DescriptorExtractor> descriptor = AKAZE::create(AKAZE::DESCRIPTOR_MLDB,0, 3, 0.002f),
@@ -162,6 +162,7 @@ private:
     float _patternWidth, _patternHeight;
     TermCriteria _criteria;
     std::string _filename;
+    int _showExtraction;
     Ptr<FeatureDetector> _detector;
     Ptr<DescriptorExtractor> _descriptor;
     Ptr<DescriptorMatcher> _matcher;
@@ -173,7 +174,7 @@ private:
     std::vector<cv::Mat> _cameraMatrix;
     std::vector<cv::Mat> _distortCoeffs;
     std::vector<cv::Mat> _xi;
-    std::vector<Mat> _omEachCamera, _tEachCamera;
+    std::vector<std::vector<Mat> > _omEachCamera, _tEachCamera;
 };
 
 #endif

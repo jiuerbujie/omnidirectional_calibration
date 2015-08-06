@@ -57,20 +57,20 @@
 #include <iostream>
 using namespace cv;
 using namespace std;
-randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float patternHeight, int nfeatures,
-    int nminiMatch, int depth, Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
+randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float patternHeight,
+    int nminiMatch, int depth, int showExtraction, Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
     Ptr<DescriptorMatcher> matcher)
 {
     _patternHeight = patternHeight;
     _patternWidth = patternWidth;
     _nminiMatch = nminiMatch;
-    _nfeatures = nfeatures;
     _objectPonits.resize(0);
     _imagePoints.resize(0);
     _depth = depth;
     _detector = detector;
     _descriptor = descriptor;
     _matcher = matcher;
+    _showExtraction = showExtraction;
 }
 
 void randomPatternCornerFinder::computeObjectImagePoints(std::vector<cv::Mat> inputImages, cv::Mat patternImage)
@@ -350,8 +350,12 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
     Mat innerMask1, innerMask2;
 
     // draw raw correspondence
-    /*drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
-        innerMask1, innerMask2);*/
+    if(this->_showExtraction)
+    {
+        drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+            innerMask1, innerMask2);
+    }
+    
 
     // outlier remove
     findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
@@ -362,8 +366,11 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
     // draw filtered correspondence
-    /*drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
-    innerMask1, innerMask2);*/
+    if (this->_showExtraction)
+    {
+        drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
+            innerMask1, innerMask2);
+    }
 
     std::vector<Vec3d> objectPoints;
 

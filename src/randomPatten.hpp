@@ -62,11 +62,11 @@ public:
 
     @param patternWidth the real width of "random" pattern in a user defined unit.
     @param patternHeight the real height of "random" pattern in a user defined unit.
-    @param nfeatures nunber of ORB keypoints, see ORB::ORB() for detail
+    
     @param nMiniMatch number of minimal matches, otherwise that image is abandoned
     */
-    randomPatternCornerFinder(float patternWidth, float patternHeight, int nfeatures,
-        int nminiMatch, int depth, Ptr<FeatureDetector> detector,
+    randomPatternCornerFinder(float patternWidth, float patternHeight,
+        int nminiMatch, int depth, int showExtraction, Ptr<FeatureDetector> detector,
         Ptr<DescriptorExtractor> descriptor, Ptr<DescriptorMatcher> matcher);
 
     /* @brief Compute matched object points and image points which are used for calibration
@@ -100,7 +100,7 @@ private:
     std::vector<cv::Mat> _objectPonits, _imagePoints;
     float _patternWidth, _patternHeight;
     cv::Size _patternImageSize;
-    int _nminiMatch, _nfeatures;
+    int _nminiMatch;
     int _depth;
     Ptr<FeatureDetector> _detector;
     Ptr<DescriptorExtractor> _descriptor;
@@ -108,6 +108,7 @@ private:
     Mat _descriptorPattern;
     std::vector<cv::KeyPoint> _keypointsPattern;
     Mat _patternImage;
+    int _showExtraction;
 
     void keyPoints2MatchedLocation(const std::vector<cv::KeyPoint>& imageKeypoints,
         const std::vector<cv::KeyPoint>& patternKeypoints, const std::vector<cv::DMatch> matchces,
