@@ -53,16 +53,22 @@ using namespace cv;
 
 #define HEAD -1
 #define INVALID -2
-/** @brief Class for multiple camera calibration. It first calibrate each camera individually,
-then a bundle adjustment like optimization is applied to refine extrinsic parameters.
-Images that are used should be named by "cameraIdx-timestamp"
-For details, please refer to paper
+
+/** @brief Class for multiple camera calibration that supports pinhole camera and omnidirection camera.
+For omnidirectional camera model, please refer to omnidir.hpp in ccalib module.
+It first calibrate each camera individually, then a bundle adjustment like optimization is applied to
+refine extrinsic parameters. So far, it only support "random" pattern for calibration,
+see randomPattern.hpp in ccalib module for details.
+Images that are used should be named by "cameraIdx-timestamp.*", several images with the same timestamp
+means that they are the same pattern that are photographed. cameraIdx should start from 0.
+
+For more details, please refer to paper
     B. Li, L. Heng, K. Kevin  and M. Pollefeys, "A Multiple-Camera System
     Calibration Toolbox Using A Feature Descriptor-Based Calibration
     Pattern", in IROS 2013.
 */
 
-class multiCameraCalibration
+class CV_EXPORTS multiCameraCalibration
 {
 public:
     enum {
@@ -111,6 +117,14 @@ public:
     @param nCameras number of cameras
     @fileName filename of string list that are used for calibration, the file is generated
     by imagelist_creator from OpenCv samples. The first one in the list is the pattern filename.
+    @patternWidth the physical width of pattern, in user defined unit.
+    @patternHeight the physical height of pattern, in user defined unit.
+    @showExtration whether show extracted features and feature filtering.
+    @nMiniMatches minimal number of matched features for a frame.
+    @criteria optimization stopping criteria.
+    @detector feature detector that detect feature points in pattern and images.
+    @descriptor feature descriptor.
+    @matcher feature matcher.
     */
     multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName, float patternWidth,
         float patternHeight, int showExtration = 0, int nMiniMatches = 20, 
@@ -135,24 +149,33 @@ public:
     */
     double run();
 
-    /* @brief write camera parameters to file
+    /* @brief write camera parameters to file.
     */
     void writeParameters(const std::string& filename);
 
 private:
     std::vector<std::string> readStringList();
+
     int getPhotoVertex(int timestamp);
+
     void graphTraverse(const Mat& G, int begin, std::vector<int>& order, std::vector<int>& pre);
+
     void findRowNonZero(const Mat& row, Mat& idx);
+
     void computeJacobianExtrinsic(const Mat& extrinsicParams, Mat& JTJ_inv, Mat& JTE);
+
     void computePhotoCameraJacobian(const Mat& rvecPhoto, const Mat& tvecPhoto, const Mat& rvecCamera,
         const Mat& tvecCamera, Mat& rvecTran, Mat& tvecTran, const Mat& objectPoints, const Mat& imagePoints, const Mat& K,
         const Mat& distort, const Mat& xi, Mat& jacobianPhoto, Mat& jacobianCamera, Mat& E);
+
     void compose_motion(InputArray _om1, InputArray _T1, InputArray _om2, InputArray _T2, Mat& om3, Mat& T3, Mat& dom3dom1,
         Mat& dom3dT1, Mat& dom3dom2, Mat& dom3dT2, Mat& dT3dom1, Mat& dT3dT1, Mat& dT3dom2, Mat& dT3dT2);
+
     void JRodriguesMatlab(const Mat& src, Mat& dst);
     void dAB(InputArray A, InputArray B, OutputArray dABdA, OutputArray dABdB);
+
     double computeProjectError(Mat& parameters);
+
     void vector2parameters(const Mat& parameters, std::vector<Vec3f>& rvecVertex, std::vector<Vec3f>& tvecVertexs);
     void parameters2vector(const std::vector<Vec3f>& rvecVertex, const std::vector<Vec3f>& tvecVertex, Mat& parameters);
 
