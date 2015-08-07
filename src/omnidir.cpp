@@ -58,6 +58,7 @@
  */
 #include "precomp.hpp"
 #include "omnidir.hpp"
+#include "opencv2/highgui.hpp"
 #include <fstream>
 #include <iostream>
 namespace cv { namespace
@@ -244,8 +245,8 @@ void cv::omnidir::undistortPoints( InputArray distorted, OutputArray undistorted
     InputArray K, InputArray D, double xi, InputArray R)
 {
     CV_Assert(distorted.type() == CV_64FC2 || distorted.type() == CV_32FC2);
-    CV_Assert(R.empty() || R.size() == Size(3, 3) || R.total() * R.channels() == 3);
-    CV_Assert(R.depth() == CV_64F || R.depth() == CV_32F);
+    CV_Assert(R.empty() || (!R.empty() && (R.size() == Size(3, 3) || R.total() * R.channels() == 3)
+        && (R.depth() == CV_64F || R.depth() == CV_32F)));
     CV_Assert((D.depth() == CV_64F || D.depth() == CV_32F) && D.total() == 4);
     CV_Assert(K.size() == Size(3, 3) && (K.depth() == CV_64F || K.depth() == CV_32F));
 
@@ -360,7 +361,7 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
         Matx33f camMat = K.getMat();
         f = Vec2f(camMat(0, 0), camMat(1, 1));
         c = Vec2f(camMat(0, 2), camMat(1, 2));
-        s = camMat(0,1);
+        s = (double)camMat(0,1);
     }
     else
     {
@@ -393,7 +394,7 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
     // rotate points to the right half ball
     //if(flags == omnidir::RECTIFY_CYLINDRICAL || flags == omnidir::RECTIFY_LONGLATI)
     //{
-    //    Vec3d omTemp(-3.1415/2, 0.0, 0.0);
+    //    Vec3d omTemp(3.1415/2, 0.0, 0.0);
     //    Matx33d RTemp;
     //    Rodrigues(omTemp, RTemp);
     //    RR = RR * RTemp;
@@ -475,19 +476,6 @@ void cv::omnidir::initUndistortRectifyMap(InputArray K, InputArray D, double xi,
                 }
                 else if (flags == omnidir::RECTIFY_LONGLATI)
                 {
-                    //_xt = std::sin(theta)*std::sin(h);
-                    //_yt = -std::cos(h);
-                    //_wt = -std::cos(theta)*std::sin(h);
-                    //_xt = std::cos(theta) * std::sin(h);
-                    //_yt = std::sin(theta) *std::sin(h);
-                    //_wt = std::cos(h);
-/*
-                    _xt = -std::cos(theta);
-                    _yt = -std::sin(theta) * std::cos(h);
-                    _wt = std::sin(theta) * std::sin(h);*/
-
-                    //double longitude = 3.14*j/size.width;
-                    //double latitude = 3.14*i/size.height;
                     _xt = -std::cos(theta);
                     _yt = -std::sin(theta) * std::cos(h);
                     _wt = std::sin(theta) * std::sin(h);
@@ -796,8 +784,8 @@ void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays
         imagePointsTemp2[i] = imagePoints2.getMat(i).clone();
     }
 
-    omnidir::calibrate(objectPointsTemp1, imagePointsTemp1, size1, _K1, _xi1m, _D1, omAllTemp1, tAllTemp1, flags, TermCriteria(3, 50, 1e-6), idx1);
-    omnidir::calibrate(objectPointsTemp2, imagePointsTemp2, size2, _K2, _xi2m, _D2, omAllTemp2, tAllTemp2, flags, TermCriteria(3, 50, 1e-6), idx2);
+    omnidir::calibrate(objectPointsTemp1, imagePointsTemp1, size1, _K1, _xi1m, _D1, omAllTemp1, tAllTemp1, flags, TermCriteria(3, 100, 1e-6), idx1);
+    omnidir::calibrate(objectPointsTemp2, imagePointsTemp2, size2, _K2, _xi2m, _D2, omAllTemp2, tAllTemp2, flags, TermCriteria(3, 100, 1e-6), idx2);
 
     // find the intersection idx
     Mat interIdx1, interIdx2, interOri;
@@ -817,10 +805,12 @@ void cv::omnidir::internal::initializeStereoCalibration(InputOutputArrayOfArrays
     for(int i = 0; i < (int)interIdx1.total(); ++i)
     {
         objectPointsTemp1[interOri.at<int>(i)].copyTo(objectPoints.getMat(i));
-        omAll1[i] = omAllTemp1[interOri.at<int>(i)];
-        tAll1[i] = tAllTemp1[interOri.at<int>(i)];
-        omAll2[i] = omAllTemp2[interOri.at<int>(i)];
-        tAll2[i] = tAllTemp2[interOri.at<int>(i)];
+        imagePointsTemp1[interOri.at<int>(i)].copyTo(imagePoints1.getMat(i));
+        imagePointsTemp2[interOri.at<int>(i)].copyTo(imagePoints2.getMat(i));
+        omAll1[i] = omAllTemp1[interIdx1.at<int>(i)];
+        tAll1[i] = tAllTemp1[interIdx1.at<int>(i)];
+        omAll2[i] = omAllTemp2[interIdx2.at<int>(i)];
+        tAll2[i] = tAllTemp2[interIdx2.at<int>(i)];
         /*objectPointsTemp1[interIdx1.at<int>(i)].copyTo(objectPoints.getMat(i));
         imagePointsTemp1[interIdx1.at<int>(i)].copyTo(imagePoints1.getMat(i));
         imagePointsTemp2[interIdx2.at<int>(i)].copyTo(imagePoints2.getMat(i));
@@ -1237,7 +1227,7 @@ double cv::omnidir::calibrate(InputArray patternPoints, InputArray imagePoints, 
     cv::omnidir::internal::encodeParameters(_K, _omAll, _tAll, Mat::zeros(1,4,CV_64F), _xi, currentParam);
 
     // optimization
-    const double alpha_smooth = 0.001;
+    const double alpha_smooth = 0.01;
     //const double thresh_cond = 1e6;
     double change = 1;
     for(int iter = 0; ; ++iter)
@@ -1351,10 +1341,10 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     CV_Assert(!imagePoints1.empty() && (imagePoints1.type() == CV_64FC2 || imagePoints1.type() == CV_32FC2));
     CV_Assert(!imagePoints2.empty() && (imagePoints2.type() == CV_64FC2 || imagePoints2.type() == CV_32FC2));
 
-    CV_Assert((!K1.empty() && K1.size() == Size(3,3)));
-    CV_Assert((!K2.empty() && K2.size() == Size(3,3)));
-    CV_Assert((!D1.empty() && D1.total() == 4));
-    CV_Assert((!D2.empty() && D2.total() == 4));
+    //CV_Assert((!K1.empty() && K1.size() == Size(3,3)));
+    //CV_Assert((!K2.empty() && K2.size() == Size(3,3)));
+    //CV_Assert((!D1.empty() && D1.total() == 4));
+    //CV_Assert((!D2.empty() && D2.total() == 4));
 
     CV_Assert(((flags & CALIB_USE_GUESS) && !K1.empty() && !D1.empty() && !K2.empty() && !D2.empty()) || !(flags & CALIB_USE_GUESS));
 
@@ -1400,11 +1390,11 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
         _idx.copyTo(idx.getMat());
     }
     
-    n = objectPoints.total();
+    n = (int)_objectPoints.size();
     Mat finalParam(1, 10 + 6*n, CV_64F);
     Mat currentParam(1, 10 + 6*n, CV_64F);
 
-    double repr1 = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
+    double repr1 = internal::computeMeanReproErrStereo(_objectPoints, _imagePoints1, _imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
         _T, _omL, _TL);
     cv::omnidir::internal::encodeParametersStereo(_K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2, currentParam);
 
@@ -1420,7 +1410,7 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
         double alpha_smooth2 = 1 - std::pow(1 - alpha_smooth, (double)iter + 1.0);
         Mat JTJ_inv, JTError;
 
-        cv::omnidir::internal::computeJacobianStereo(objectPoints, imagePoints1, imagePoints2, currentParam, JTJ_inv, JTError, flags);
+        cv::omnidir::internal::computeJacobianStereo(_objectPoints, _imagePoints1, _imagePoints2, currentParam, JTJ_inv, JTError, flags);
 
         // Gauss¨CNewton
         Mat G = alpha_smooth2*JTJ_inv * JTError;
@@ -1433,12 +1423,12 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
 
         currentParam = finalParam.clone();
         cv::omnidir::internal::decodeParametersStereo(currentParam, _K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2);
-        double repr = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
+        double repr = internal::computeMeanReproErrStereo(_objectPoints, _imagePoints1, _imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
             _T, _omL, _TL);
 
     }
     cv::omnidir::internal::decodeParametersStereo(finalParam, _K1, _K2, _om, _T, _omL, _TL, _D1, _D2, _xi1, _xi2);
-    double repr = internal::computeMeanReproErrStereo(objectPoints, imagePoints1, imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
+    double repr = internal::computeMeanReproErrStereo(_objectPoints, _imagePoints1, _imagePoints2, _K1, _K2, _D1, _D2, _xi1, _xi2, _om,
         _T, _omL, _TL);
 
     if (K1.empty())
@@ -1513,7 +1503,7 @@ double cv::omnidir::stereoCalibrate(InputOutputArrayOfArrays objectPoints, Input
     double rms;
     Mat errors;
 
-    cv::omnidir::internal::estimateUncertaintiesStereo(objectPoints, imagePoints1, imagePoints2, finalParam, errors, std_error, rms, flags);
+    cv::omnidir::internal::estimateUncertaintiesStereo(_objectPoints, _imagePoints1, _imagePoints2, finalParam, errors, std_error, rms, flags);
     return rms;
 }
 
@@ -1538,18 +1528,18 @@ void cv::omnidir::stereoReconstruct(InputArray image1, InputArray image2, InputA
     R.getMat().convertTo(_R, CV_64F);
     T.getMat().reshape(1, 3).convertTo(_T, CV_64F);
 
-    //Mat _K1 = K1.getMat(), _K2 = K2.getMat(),
-    //    _D1 = D1.getMat(), _D2 = D2.getMat(),
-    //    _R = R.getMat(), _T = T.getMat().reshape(1, 3);
-
     // stereo rectify so that stereo matching can be applied in one line
     Mat R1, R2;
     stereoRectify(_K1, _D1, xi1, _K2, _D2, xi2, _R, _T, R1, R2);
     Mat undis1, undis2;
-    Matx33d _Knew;
-    Knew.getMat().convertTo(_Knew, CV_64F);
-    undistortImage(image1, undis1, _K1, _D1, xi1, flag, _Knew, newSize, R1);
-    undistortImage(image2, undis2, _K2, _D2, xi2, flag, _Knew, newSize, R2);
+    Matx33d _Knew = Matx33d(_K1);
+    if (!Knew.empty())
+    {
+        Knew.getMat().convertTo(_Knew, CV_64F);
+    }
+
+    undistortImage(image1.getMat(), undis1, _K1, _D1, xi1, flag, _Knew, newSize, R1);
+    undistortImage(image2.getMat(), undis2, _K2, _D2, xi2, flag, _Knew, newSize, R2);
 
     // stereo matching by semi-global
     Mat _depthMap;
@@ -1561,11 +1551,11 @@ void cv::omnidir::stereoReconstruct(InputArray image1, InputArray image2, InputA
 
 	sgbm->compute(undis1, undis2, _depthMap);
 
-    depthMap.create(_depthMap.size(), _depthMap.type());
-    _depthMap.copyTo(depthMap.getMat());
-
     Mat realDepthMap;
     Mat(_depthMap / 16.0).convertTo(realDepthMap, CV_64F);
+
+    depthMap.create(realDepthMap.size(), realDepthMap.type());
+    realDepthMap.copyTo(depthMap.getMat());
 
     std::vector<Vec3d> _pointCloud;
     double baseline = cv::norm(T);
