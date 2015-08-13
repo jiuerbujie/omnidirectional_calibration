@@ -49,7 +49,14 @@
 #include "omnidir.hpp"
 #include <string>
 #include <iostream>
+
+/** @defgroup mulcalib Multiple cameras calibration toolbox
+*/
+
 using namespace cv;
+
+//! @addtogroup mulcalib
+//! @{
 
 #define HEAD -1
 #define INVALID -2
@@ -74,6 +81,7 @@ public:
     enum {
         PINHOLE,
         OMNIDIRECTIONAL
+        //FISHEYE
     };
 
     // an edge connects a camera and pattern
@@ -95,7 +103,7 @@ public:
 
     struct vertex
     {
-        Mat pose;   // relative pose to the first camera. For camera vertex, it is the 
+        Mat pose;   // relative pose to the first camera. For camera vertex, it is the
                     // transform from the first camera to this camera, for pattern vertex,
                     // it is the transform from pattern to the first camera
         int timestamp;  // timestamp of photo, only available for photo vertex
@@ -121,16 +129,17 @@ public:
     @patternHeight the physical height of pattern, in user defined unit.
     @showExtration whether show extracted features and feature filtering.
     @nMiniMatches minimal number of matched features for a frame.
+	@flags Calibration flags
     @criteria optimization stopping criteria.
     @detector feature detector that detect feature points in pattern and images.
     @descriptor feature descriptor.
     @matcher feature matcher.
     */
     multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName, float patternWidth,
-        float patternHeight, int showExtration = 0, int nMiniMatches = 20, 
-        TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 200, 0.0001),
-        Ptr<FeatureDetector> detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.002f),
-        Ptr<DescriptorExtractor> descriptor = AKAZE::create(AKAZE::DESCRIPTOR_MLDB,0, 3, 0.002f),
+        float patternHeight, int showExtration = 0, int nMiniMatches = 20, int flags = 0,
+        TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 300, 1e-7),
+        Ptr<FeatureDetector> detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.005f),
+        Ptr<DescriptorExtractor> descriptor = AKAZE::create(AKAZE::DESCRIPTOR_MLDB,0, 3, 0.005f),
         Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-L1"));
 
     /* @brief load images
@@ -179,9 +188,11 @@ private:
     void vector2parameters(const Mat& parameters, std::vector<Vec3f>& rvecVertex, std::vector<Vec3f>& tvecVertexs);
     void parameters2vector(const std::vector<Vec3f>& rvecVertex, const std::vector<Vec3f>& tvecVertex, Mat& parameters);
 
-    int _camType;
+    int _camType; //PINHOLE, FISHEYE or OMNIDIRECTIONAL
     int _nCamera;
     int _nMiniMatches;
+    int _flags;
+    double _error;
     float _patternWidth, _patternHeight;
     TermCriteria _criteria;
     std::string _filename;
@@ -200,4 +211,5 @@ private:
     std::vector<std::vector<Mat> > _omEachCamera, _tEachCamera;
 };
 
+//! @}
 #endif

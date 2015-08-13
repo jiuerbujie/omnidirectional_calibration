@@ -247,7 +247,7 @@ int main(int argc, char** argv)
     Mat K, D, xi, idx;
     vector<Vec3d> rvecs, tvecs;
     double _xi, rms;
-    TermCriteria criteria(3, 100, 1e-4);
+    TermCriteria criteria(3, 200, 1e-8);
     rms = omnidir::calibrate(objectPoints, imagePoints, imageSize, K, xi, D, rvecs, tvecs, flags, criteria, idx);
     _xi = xi.at<double>(0);
     saveCameraParams(outputFilename, imageSize, boardSize, square_width, square_height, flags, K, D, _xi,

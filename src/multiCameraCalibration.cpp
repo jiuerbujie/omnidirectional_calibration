@@ -1,18 +1,78 @@
+/*M///////////////////////////////////////////////////////////////////////////////////////
+//
+//  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+//
+//  By downloading, copying, installing or using the software you agree to this license.
+//  If you do not agree to this license, do not download, install,
+//  copy or use the software.
+//
+//
+//                           License Agreement
+//                For Open Source Computer Vision Library
+//
+// Copyright (C) 2015, Baisheng Lai (laibaisheng@gmail.com), Zhejiang University,
+// all rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+//
+//   * Redistribution's of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//
+//   * Redistribution's in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//
+//   * The name of the copyright holders may not be used to endorse or promote products
+//     derived from this software without specific prior written permission.
+//
+// This software is provided by the copyright holders and contributors "as is" and
+// any express or implied warranties, including, but not limited to, the implied
+// warranties of merchantability and fitness for a particular purpose are disclaimed.
+// In no event shall the Intel Corporation or contributors be liable for any direct,
+// indirect, incidental, special, exemplary, or consequential damages
+// (including, but not limited to, procurement of substitute goods or services;
+// loss of use, data, or profits; or business interruption) however caused
+// and on any theory of liability, whether in contract, strict liability,
+// or tort (including negligence or otherwise) arising in any way out of
+// the use of this software, even if advised of the possibility of such damage.
+//
+//M*/
+
+/**
+ * This module was accepted as a GSoC 2015 project for OpenCV, authored by
+ * Baisheng Lai, mentored by Bo Li.
+ *
+ * The omnidirectional camera in this module is denoted by the catadioptric
+ * model. Please refer to Mei's paper for details of the camera model:
+ *
+ *      C. Mei and P. Rives, "Single view point omnidirectional camera
+ *      calibration from planar grids", in ICRA 2007.
+ *
+ * The implementation of the calibration part is based on Li's calibration
+ * toolbox:
+ *
+ *     B. Li, L. Heng, K. Kevin  and M. Pollefeys, "A Multiple-Camera System
+ *     Calibration Toolbox Using A Feature Descriptor-Based Calibration
+ *     Pattern", in IROS 2013.
+ */
+
 #include "precomp.hpp"
 #include "multiCameraCalibration.hpp"
 #include<string>
 #include <vector>
-#include<queue>
+#include <queue>
 #include <iostream>
 using namespace cv;
 
 multiCameraCalibration::multiCameraCalibration(int cameraType, int nCameras, const std::string& fileName,
-    float patternWidth, float patternHeight, int showExtration, int nMiniMatches, TermCriteria criteria,
+    float patternWidth, float patternHeight, int showExtration, int nMiniMatches, int flags, TermCriteria criteria,
     Ptr<FeatureDetector> detector, Ptr<DescriptorExtractor> descriptor,
     Ptr<DescriptorMatcher> matcher)
 {
     _camType = cameraType;
     _nCamera = nCameras;
+    _flags = flags;
     _nMiniMatches = nMiniMatches;
     _filename = fileName;
     _patternWidth = patternWidth;
@@ -49,9 +109,9 @@ std::vector<std::string> multiCameraCalibration::readStringList()
     std::vector<std::string> l;
     l.resize(0);
     FileStorage fs(_filename, FileStorage::READ);
-    
+
     FileNode n = fs.getFirstTopLevelNode();
-        
+
     FileNodeIterator it = n.begin(), it_end = n.end();
     for( ; it != it_end; ++it )
         l.push_back((std::string)*it);
@@ -84,8 +144,8 @@ void multiCameraCalibration::loadImages()
     {
         int cameraVertex, timestamp;
         std::string filename = file_list[i].substr(0, file_list[i].find('.'));
-        int spritPosition1 = filename.rfind('/');
-        int spritPosition2 = filename.rfind('\\');
+        size_t spritPosition1 = filename.rfind('/');
+        size_t spritPosition2 = filename.rfind('\\');
         if (spritPosition1!=std::string::npos)
         {
             filename = filename.substr(spritPosition1+1, filename.size() - 1);
@@ -98,10 +158,10 @@ void multiCameraCalibration::loadImages()
         filesEachCameraFull[cameraVertex].push_back(file_list[i]);
         timestampFull[cameraVertex].push_back(timestamp);
     }
-    
+
 
     // calibrate each camera individually
-    for (int camera = 0; camera < _nCamera; ++camera)
+    for (int camera = 2; camera < _nCamera; ++camera)
     {
         Mat image, cameraMatrix, distortCoeffs;
 
@@ -110,8 +170,11 @@ void multiCameraCalibration::loadImages()
         {
             image = imread(filesEachCameraFull[camera][imgIdx], IMREAD_GRAYSCALE);
             std::vector<Mat> imgObj = finder.computeObjectImagePointsForSingle(image);
-            _imagePointsForEachCamera[camera].push_back(imgObj[0]);
-            _objectPointsForEachCamera[camera].push_back(imgObj[1]);
+			if ((int)imgObj[0].total() > _nMiniMatches)
+			{
+				_imagePointsForEachCamera[camera].push_back(imgObj[0]);
+				_objectPointsForEachCamera[camera].push_back(imgObj[1]);
+			}
         }
 
         // calibrate
@@ -121,27 +184,39 @@ void multiCameraCalibration::loadImages()
         {
             rms = cv::calibrateCamera(_objectPointsForEachCamera[camera], _imagePointsForEachCamera[camera],
                 image.size(), _cameraMatrix[camera], _distortCoeffs[camera], _omEachCamera[camera],
-                _tEachCamera[camera]);
+                _tEachCamera[camera],_flags);
             idx = Mat(1, (int)_omEachCamera[camera].size(), CV_32S);
             for (int i = 0; i < (int)idx.total(); ++i)
             {
                 idx.at<int>(i) = i;
             }
         }
+        //else if (_camType == FISHEYE)
+        //{
+        //    rms = cv::fisheye::calibrate(_objectPointsForEachCamera[camera], _imagePointsForEachCamera[camera],
+        //        image.size(), _cameraMatrix[camera], _distortCoeffs[camera], _omEachCamera[camera],
+        //        _tEachCamera[camera], _flags);
+        //    idx = Mat(1, (int)_omEachCamera[camera].size(), CV_32S);
+        //    for (int i = 0; i < (int)idx.total(); ++i)
+        //    {
+        //        idx.at<int>(i) = i;
+        //    }
+        //}
         else if (_camType == OMNIDIRECTIONAL)
         {
             rms = cv::omnidir::calibrate(_objectPointsForEachCamera[camera], _imagePointsForEachCamera[camera],
                 image.size(), _cameraMatrix[camera], _xi[camera], _distortCoeffs[camera], _omEachCamera[camera],
-                _tEachCamera[camera], 0, TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 1e-7),
+                _tEachCamera[camera], _flags, TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 300, 1e-7),
                 idx);
         }
         _cameraMatrix[camera].convertTo(_cameraMatrix[camera], CV_32F);
         _distortCoeffs[camera].convertTo(_distortCoeffs[camera], CV_32F);
+        _xi[camera].convertTo(_xi[camera], CV_32F);
         //else
         //{
         //    CV_Error_(CV_StsOutOfRange, "Unknown camera type, use PINHOLE or OMNIDIRECTIONAL");
         //}
-        
+
         for (int i = 0; i < (int)_omEachCamera[camera].size(); ++i)
         {
             if ((int)_objectPointsForEachCamera[camera][idx.at<int>(i)].total() > _nMiniMatches)
@@ -171,6 +246,7 @@ void multiCameraCalibration::loadImages()
                 this->_edgeList.push_back(edge(cameraVertex, photoVertex, idx.at<int>(i), transform));
             }
         }
+		std::cout << "initialized for camera " << camera << " rms = " << rms << std::endl;
     }
 
 }
@@ -203,10 +279,10 @@ void multiCameraCalibration::initialize()
 {
     int nVertices = (int)_vertexList.size();
     int nEdges = (int) _edgeList.size();
-    
+
     // build graph
-    Mat G = Mat::zeros((int)this->_vertexList.size(), (int)this->_vertexList.size(), CV_32S);
-    for (int edgeIdx = 0; edgeIdx < (int)this->_edgeList.size(); ++edgeIdx)
+    Mat G = Mat::zeros(nVertices, nVertices, CV_32S);
+    for (int edgeIdx = 0; edgeIdx < nEdges; ++edgeIdx)
     {
         G.at<int>(this->_edgeList[edgeIdx].cameraVertex, this->_edgeList[edgeIdx].photoVertex) = edgeIdx + 1;
     }
@@ -248,7 +324,7 @@ double multiCameraCalibration::optimizeExtrinsics()
 {
     // get om, t vector
     int nVertex = (int)this->_vertexList.size();
-    
+
     Mat extrinParam(1, (nVertex-1)*6, CV_32F);
     int offset = 0;
     // the pose of the vertex[0] is eye
@@ -281,7 +357,7 @@ double multiCameraCalibration::optimizeExtrinsics()
         {
             G.convertTo(G, CV_32F);
         }
-        
+
         extrinParam = extrinParam + G.reshape(1, 1);
         change = norm(G) / norm(extrinParam);
         double error = computeProjectError(extrinParam);
@@ -311,7 +387,7 @@ void multiCameraCalibration::computeJacobianExtrinsic(const Mat& extrinsicParams
 
     for (int edgeIdx = 0; edgeIdx < nEdge; ++edgeIdx)
     {
-        int nPoints = _objectPointsForEachCamera[_edgeList[edgeIdx].cameraVertex][_edgeList[edgeIdx].photoIndex].total();
+        int nPoints = (int)_objectPointsForEachCamera[_edgeList[edgeIdx].cameraVertex][_edgeList[edgeIdx].photoIndex].total();
         pointsLocation[edgeIdx+1] = pointsLocation[edgeIdx] + nPoints*2;
     }
 
@@ -334,7 +410,7 @@ void multiCameraCalibration::computeJacobianExtrinsic(const Mat& extrinsicParams
         Mat R = _edgeList[edgeIdx].transform.rowRange(0, 3).colRange(0, 3);
         tvecTran = _edgeList[edgeIdx].transform.rowRange(0, 3).col(3);
         cv::Rodrigues(R, rvecTran);
-        
+
         Mat rvecPhoto = extrinsicParams.colRange((photoVertex-1)*6, (photoVertex-1)*6 + 3);
         Mat tvecPhoto = extrinsicParams.colRange((photoVertex-1)*6 + 3, (photoVertex-1)*6 + 6);
 
@@ -389,20 +465,24 @@ void multiCameraCalibration::computePhotoCameraJacobian(const Mat& rvecPhoto, co
     {
         tvecTran.convertTo(tvecTran, CV_32F);
     }
-    float _xi;
+    float xif = 0.0f;
     if (_camType == OMNIDIRECTIONAL)
     {
-        _xi= xi.at<float>(0);
+        xif= xi.at<float>(0);
     }
-    
+
     Mat imagePoints2, jacobian, dx_drvecCamera, dx_dtvecCamera, dx_drvecPhoto, dx_dtvecPhoto;
     if (_camType == PINHOLE)
     {
         cv::projectPoints(objectPoints, rvecTran, tvecTran, K, distort, imagePoints2, jacobian);
     }
+    //else if (_camType == FISHEYE)
+    //{
+    //    cv::fisheye::projectPoints(objectPoints, imagePoints2, rvecTran, tvecTran, K, distort, 0, jacobian);
+    //}
     else if (_camType == OMNIDIRECTIONAL)
     {
-        cv::omnidir::projectPoints(objectPoints, imagePoints2, rvecTran, tvecTran, K, _xi, distort, jacobian);    
+        cv::omnidir::projectPoints(objectPoints, imagePoints2, rvecTran, tvecTran, K, xif, distort, jacobian);
     }
     if (objectPoints.depth() == CV_32F)
     {
@@ -486,7 +566,7 @@ void multiCameraCalibration::findRowNonZero(const Mat& row, Mat& idx)
 double multiCameraCalibration::computeProjectError(Mat& parameters)
 {
     int nVertex = (int)_vertexList.size();
-    CV_Assert(parameters.total() == (nVertex-1) * 6 && parameters.depth() == CV_32F);
+    CV_Assert((int)parameters.total() == (nVertex-1) * 6 && parameters.depth() == CV_32F);
     int nEdge = (int)_edgeList.size();
 
     // recompute the transform between photos and cameras
@@ -504,7 +584,7 @@ double multiCameraCalibration::computeProjectError(Mat& parameters)
         int photoVertex = edgeList[edgeIdx].photoVertex;
         int PhotoIndex = edgeList[edgeIdx].photoIndex;
         TPhoto = Mat(tvecVertex[photoVertex - 1]).reshape(1, 3);
-        
+
         //edgeList[edgeIdx].transform = Mat::ones(4, 4, CV_32F);
         transform = Mat::eye(4, 4, CV_32F);
         cv::Rodrigues(rvecVertex[photoVertex-1], RPhoto);
@@ -539,10 +619,15 @@ double multiCameraCalibration::computeProjectError(Mat& parameters)
             cv::projectPoints(objectPoints, rvec, tvec, _cameraMatrix[cameraVertex], _distortCoeffs[cameraVertex],
                 proImagePoints);
         }
+        //else if (this->_camType == FISHEYE)
+        //{
+        //    cv::fisheye::projectPoints(objectPoints, proImagePoints, rvec, tvec, _cameraMatrix[cameraVertex],
+        //        _distortCoeffs[cameraVertex]);
+        //}
         else if (this->_camType == OMNIDIRECTIONAL)
         {
             float xi = _xi[cameraVertex].at<float>(0);
-            
+
             cv::omnidir::projectPoints(objectPoints, proImagePoints, rvec, tvec, _cameraMatrix[cameraVertex],
                 xi, _distortCoeffs[cameraVertex]);
         }
@@ -555,6 +640,7 @@ double multiCameraCalibration::computeProjectError(Mat& parameters)
         totalNPoints += (int)error.total();
     }
     double meanReProjError = totalError / totalNPoints;
+    _error = meanReProjError;
     return meanReProjError;
 }
 
@@ -674,7 +760,7 @@ void multiCameraCalibration::dAB(InputArray A, InputArray B, OutputArray dABdA, 
 void multiCameraCalibration::vector2parameters(const Mat& parameters, std::vector<Vec3f>& rvecVertex, std::vector<Vec3f>& tvecVertexs)
 {
     int nVertex = (int)_vertexList.size();
-    CV_Assert(parameters.channels() == 1 && parameters.total() == 6*(nVertex - 1));
+    CV_Assert((int)parameters.channels() == 1 && (int)parameters.total() == 6*(nVertex - 1));
     CV_Assert(parameters.depth() == CV_32F);
     parameters.reshape(1, 1);
 
@@ -723,9 +809,11 @@ void multiCameraCalibration::writeParameters(const std::string& filename)
         {
             fs << cameraXi << _xi[camIdx].at<float>(0);
         }
-        
+
         fs << cameraPose << _vertexList[camIdx].pose;
     }
+
+    fs << "meanReprojectError" <<_error;
 
     for (int photoIdx = _nCamera; photoIdx < (int)_vertexList.size(); ++photoIdx)
     {

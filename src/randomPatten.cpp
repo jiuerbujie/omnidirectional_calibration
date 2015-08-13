@@ -45,7 +45,7 @@
 
  * This module implements points extraction from a "random" pattern image.
  * It returns 3D object points and 2D image pixels that can be used for calibration.
- * Compared with traditional calibration object like chessboard, it is useful when pattern is 
+ * Compared with traditional calibration object like chessboard, it is useful when pattern is
  * partly occluded or only a part of pattern can be observed in multiple cameras calibration.
  * For detail, refer to this paper
  * B. Li, L. Heng, K. Kevin  and M. Pollefeys, "A Multiple-Camera System
@@ -104,8 +104,8 @@ randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float p
 //        descriptorImage2.convertTo(descriptorImage2, CV_32F);
 //
 //        // match with pattern
-//        std::vector<DMatch> matchesImgtoPat, matchesImgtoPat1, matchesImgtoPat2; 
-//        
+//        std::vector<DMatch> matchesImgtoPat, matchesImgtoPat1, matchesImgtoPat2;
+//
 //        crossCheckMatching(this->_matcher, descriptorImage1, descriptorPattern, matchesImgtoPat1, 1);
 //        crossCheckMatching(this->_matcher, descriptorImage2, descriptorPattern, matchesImgtoPat2, 1);
 //
@@ -134,7 +134,7 @@ randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float p
 //            drawCorrespondence(inputImages[i], keypointsImage, this->_patternImage, keypointsPattern, matchesImgtoPat,
 //                innerMask1, innerMask2);
 //        }
-//        
+//
 //        // outlier remove
 //        findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
 //            FM_7POINT, 1, 0.99, innerMask1);
@@ -149,11 +149,11 @@ randomPatternCornerFinder::randomPatternCornerFinder(float patternWidth, float p
 //            drawCorrespondence(inputImages[i], keypointsImage, this->_patternImage, keypointsPattern, matchesImgtoPat,
 //                innerMask1, innerMask2);
 //        }
-//        
+//
 //        if((int)keypointsImageLocation.total() > _nminiMatch)
 //        {
 //            getObjectImagePoints(keypointsImageLocation, keypointsPatternLocation);
-//        } 
+//        }
 //    }
 //}
 
@@ -384,14 +384,14 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
         drawCorrespondence(inputImage, keypointsImage, _patternImage, _keypointsPattern, matchesImgtoPat,
             innerMask1, innerMask2);
     }
-    
+
 
     // outlier remove
     findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
-        FM_7POINT, 1, 0.99, innerMask1);
+        FM_8POINT, 1, 0.999, innerMask1);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
 
-    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 3, innerMask2);
+    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 10*inputImage.cols/1000, innerMask2);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
     // draw filtered correspondence

@@ -42,10 +42,16 @@
 #define __OPENCV_OMNIDIR_HPP__
 #include "precomp.hpp"
 #include <iostream>
+
+/** @defgroup omnidir Omnidirectional camera calibration
+*/
 namespace cv
 {
 namespace omnidir
 {
+    //! @addtogroup omnidir
+    //! @{
+
     enum {
         CALIB_USE_GUESS             = 1,
         CALIB_FIX_SKEW              = 2,
@@ -63,6 +69,11 @@ namespace omnidir
         RECTIFY_CYLINDRICAL         = 2,
         RECTIFY_LONGLATI            = 3,
         RECTIFY_STEREOGRAPHIC       = 4
+    };
+
+    enum{
+        XYZRGB  = 1,
+        XYZ     = 2
     };
 /**
  * This module was accepted as a GSoC 2015 project for OpenCV, authored by
@@ -103,7 +114,7 @@ namespace omnidir
     @param undistorted array of normalized object points, vector of Vec2f/Vec2d or 1xN/Nx1 2-channel Mat with the same
     depth of distorted points.
      */
-    CV_EXPORTS_W void undistortPoints(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, InputArray R);
+    CV_EXPORTS_W void undistortPoints(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, InputArray xi, InputArray R);
 
     /** @brief Computes undistortion and rectification maps for omnidirectional camera image transform by a rotation R.
     It output two maps that are used for cv::remap(). If D is empty then zero distortion is used,
@@ -111,17 +122,18 @@ namespace omnidir
 
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$, with depth CV_32F or CV_64F
     @param D Input vector of distortion coefficients \f$(k_1, k_2, p_1, p_2)\f$, with depth CV_32F or CV_64F
+    @param xi The parameter xi for CMei's model
     @param R Rotation transform between the original and object space : 3x3 1-channel, or vector: 3x1/1x3, with depth CV_32F or CV_64F
     @param P New camera matrix (3x3) or new projection matrix (3x4)
     @param size Undistorted image size.
-    @param m1type Type of the first output map that can be CV_32FC1 or CV_16SC2 . See convertMaps()
+    @param mltype Type of the first output map that can be CV_32FC1 or CV_16SC2 . See convertMaps()
     for details.
     @param map1 The first output map.
     @param map2 The second output map.
     @param flags Flags indicates the rectification type,  RECTIFY_PERSPECTIVE, RECTIFY_CYLINDRICAL, RECTIFY_LONGLATI and RECTIFY_STEREOGRAPHIC
     are supported.
      */
-    CV_EXPORTS_W void initUndistortRectifyMap(InputArray K, InputArray D, double xi, InputArray R, InputArray P, const cv::Size& size,
+    CV_EXPORTS_W void initUndistortRectifyMap(InputArray K, InputArray D, InputArray xi, InputArray R, InputArray P, const cv::Size& size,
         int mltype, OutputArray map1, OutputArray map2, int flags);
 
     /** @brief Undistort omnidirectional images to perspective images
@@ -131,16 +143,17 @@ namespace omnidir
     @param K Camera matrix \f$K = \vecthreethree{f_x}{s}{c_x}{0}{f_y}{c_y}{0}{0}{_1}\f$.
     @param D Input vector of distortion coefficients \f$(k_1, k_2, p_1, p_2)\f$.
     @param xi The parameter xi for CMei's model.
+    @param flags Flags indicates the rectification type,  RECTIFY_PERSPECTIVE, RECTIFY_CYLINDRICAL, RECTIFY_LONGLATI and RECTIFY_STEREOGRAPHIC
     @param Knew Camera matrix of the distorted image. If it is not assigned, it is just K.
     @param new_size The new image size. By default, it is the size of distorted.
     @param R Rotation matrix between the input and output images. By default, it is identity matrix.
     */
-    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, double xi, int flags,
-        InputArray Knew = cv::noArray(), const Size& new_size = Size(), InputArray R = Matx33d::eye());
+    CV_EXPORTS_W void undistortImage(InputArray distorted, OutputArray undistorted, InputArray K, InputArray D, InputArray xi, int flags,
+        InputArray Knew = cv::noArray(), const Size& new_size = Size(), InputArray R = Mat::eye(3, 3, CV_64F));
 
-        /** @brief Perform omnidirectional camera calibration, the default depth of outputs is CV_64F.
+    /** @brief Perform omnidirectional camera calibration, the default depth of outputs is CV_64F.
 
-    @param objectPoints Vector of vector of Vec3f object points in world (pattern) coordinate. 
+    @param objectPoints Vector of vector of Vec3f object points in world (pattern) coordinate.
     It also can be vector of Mat with size 1xN/Nx1 and type CV_32FC3. Data with depth of 64_F is also acceptable.
     @param imagePoints Vector of vector of Vec2f corresponding image points of objectPoints. It must be the same
     size and the same type with objectPoints.
@@ -148,14 +161,14 @@ namespace omnidir
     @param K Output calibrated camera matrix.
     @param xi Output parameter xi for CMei's model
     @param D Output distortion parameters \f$(k_1, k_2, p_1, p_2)\f$
-    @param omAll Output rotations for each calibration images
-    @param tAll Output translation for each calibration images
+    @param rvecs Output rotations for each calibration images
+    @param tvecs Output translation for each calibration images
     @param flags The flags that control calibrate
     @param criteria Termination criteria for optimization
     @param idx Indices of images that pass initialization, which are really used in calibration. So the size of rvecs is the
     same as idx.total().
     */
-    CV_EXPORTS_W double calibrate(InputArray patternPoints, InputArray imagePoints, Size size,
+    CV_EXPORTS_W double calibrate(InputArray objectPoints, InputArray imagePoints, Size size,
         InputOutputArray K, InputOutputArray xi, InputOutputArray D, OutputArrayOfArrays rvecs, OutputArrayOfArrays tvecs,
         int flags, TermCriteria criteria, OutputArray idx=noArray());
 
@@ -168,9 +181,10 @@ namespace omnidir
     It must be the same size and the same type as objectPoints.
     @param imagePoints2 The corresponding image points of the second camera, with type vector<vector<Vec2f> >.
     It must be the same size and the same type as objectPoints.
-    @param imageSize Image size of calibration images.
+    @param imageSize1 Image size of calibration images of the first camera.
+    @param imageSize2 Image size of calibration images of the second camera.
     @param K1 Output camera matrix for the first camera.
-    @param xi1 Output parameter xi of Mei's model for the first camera 
+    @param xi1 Output parameter xi of Mei's model for the first camera
     @param D1 Output distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the first camera
     @param K2 Output camera matrix for the first camera.
     @param xi2 Output parameter xi of CMei's model for the second camera
@@ -191,26 +205,17 @@ namespace omnidir
 
     /** @brief Stereo rectification for omnidirectional camera model. It computes the rectification rotations for two cameras
 
-    @param K1 Input camera matrix of the first camera
-    @param D1 Input distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the first camera
-    @param xi1 Input parameter xi for the first camera for CMei's model
-    @param K2 Input camera matrix of the second camera
-    @param D2 Input distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the second camera
-    @param xi2 Input parameter xi for the second camera for CMei's model
     @param R Rotation between the first and second camera
     @param T Translation between the first and second camera
     @param R1 Output 3x3 rotation matrix for the first camera
     @param R2 Output 3x3 rotation matrix for the second camera
-    @param P1 Output 3x4 projection matrix in the rectified coordinate systems for the first
-    camera.
-    @param P2 Output 3x4 projection matrix in the rectified coordinate systems for the second
-    camera.
     */
-    CV_EXPORTS_W void stereoRectify(InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2,
-        InputArray R, InputArray T, OutputArray R1, OutputArray R2, OutputArray P1 = noArray(), OutputArray P2 = noArray());
+    CV_EXPORTS_W void stereoRectify(InputArray R, InputArray T, OutputArray R1, OutputArray R2);
 
     /** @brief Stereo 3D reconstruction from a pair of images
 
+    @param image1 The first input image
+    @param image2 The second input image
     @param K1 Input camera matrix of the first camera
     @param D1 Input distortion parameters \f$(k_1, k_2, p_1, p_2)\f$ for the first camera
     @param xi1 Input parameter xi for the first camera for CMei's model
@@ -222,14 +227,18 @@ namespace omnidir
     @param flag Flag of rectification type, RECTIFY_PERSPECTIVE or RECTIFY_LONGLATI
     @param numDisparities The parameter 'numDisparities' in StereoSGBM, see StereoSGBM for details.
     @param SADWindowSize The parameter 'SADWindowSize' in StereoSGBM, see StereoSGBM for details.
-    @param depth Depth map generated by stereo matching
-    @param pointCloud Point cloud of 3D reconstruction, with type CV_64FC3
+    @param disparity Disparity map generated by stereo matching
+    @param image1Rec Rectified image of the first image
+    @param image2Rec rectified image of the second image
     @param newSize Image size of rectified image, see omnidir::undistortImage
     @param Knew New camera matrix of rectified image, see omnidir::undistortImage
+    @param pointCloud Point cloud of 3D reconstruction, with type CV_64FC3
+    @param pointType Point cloud type, it can be XYZRGB or XYZ
     */
-    CV_EXPORTS_W void stereoReconstruct(InputArray image1, InputArray image2, InputArray K1, InputArray D1, double xi1, InputArray K2, InputArray D2, double xi2,
-        InputArray R, InputArray T, int flag, int numDisparities, int SADWindowSize, OutputArray depth, OutputArray pointCloud, 
-        const Size& newSize = Size(), InputArray Knew = cv::noArray());
+    CV_EXPORTS_W void stereoReconstruct(InputArray image1, InputArray image2, InputArray K1, InputArray D1, InputArray xi1,
+        InputArray K2, InputArray D2, InputArray xi2, InputArray R, InputArray T, int flag, int numDisparities, int SADWindowSize,
+        OutputArray disparity, OutputArray image1Rec, OutputArray image2Rec, const Size& newSize = Size(), InputArray Knew = cv::noArray(),
+        OutputArray pointCloud = cv::noArray(), int pointType = XYZRGB);
 
 namespace internal
 {
@@ -294,6 +303,7 @@ namespace internal
     //void dAB(InputArray A, InputArray B, OutputArray dABdA, OutputArray dABdB);
 } // internal
 
+//! @}
 
 } // omnidir
 

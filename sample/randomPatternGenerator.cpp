@@ -1,6 +1,6 @@
 #include "../src/randomPatten.hpp";
 
-const char * usage = 
+const char * usage =
     "\n example command line for generating a random pattern. \n"
     "   randomPatternGenerator -iw 600 -ih 850 pattern.png\n"
     "\n";
