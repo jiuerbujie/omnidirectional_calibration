@@ -388,10 +388,10 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
 
     // outlier remove
     findFundamentalMat(keypointsImageLocation, keypointsPatternLocation,
-        FM_8POINT, 1, 0.999, innerMask1);
+        FM_RANSAC, 1, 0.995, innerMask1);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
 
-    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 10*inputImage.cols/1000, innerMask2);
+    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 20*inputImage.cols/1000, innerMask2);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
     // draw filtered correspondence

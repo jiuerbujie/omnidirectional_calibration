@@ -133,7 +133,7 @@ void multiCameraCalibration::loadImages()
     Ptr<DescriptorExtractor> descriptor = _descriptor;
     Ptr<DescriptorMatcher> matcher = _matcher;
 
-    randomPatternCornerFinder finder(_patternWidth, _patternHeight, 10, CV_32F, this->_showExtraction, detector, descriptor, matcher);
+    randomPatternCornerFinder finder(_patternWidth, _patternHeight, _nMiniMatches, CV_32F, this->_showExtraction, detector, descriptor, matcher);
     Mat pattern = cv::imread(file_list[0]);
     finder.loadPattern(pattern);
 
