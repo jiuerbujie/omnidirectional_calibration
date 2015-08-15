@@ -53,7 +53,7 @@
  * Pattern", in IROS 2013.
  */
 #include "precomp.hpp"
-#include "randomPatten.hpp"
+#include "opencv2/randomPatten.hpp"
 #include <iostream>
 using namespace cv;
 using namespace std;
@@ -357,8 +357,8 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
 
     cv::Mat keypointsImageLocation, keypointsPatternLocation;
 
-    crossCheckMatching(this->_matcher, descriptorImage1, this->_descriptorPattern, matchesImgtoPat1, 2);
-    crossCheckMatching(this->_matcher, descriptorImage2, this->_descriptorPattern, matchesImgtoPat2, 2);
+    crossCheckMatching(this->_matcher, descriptorImage1, this->_descriptorPattern, matchesImgtoPat1, 5);
+    crossCheckMatching(this->_matcher, descriptorImage2, this->_descriptorPattern, matchesImgtoPat2, 5);
     if ((int)matchesImgtoPat1.size() > (int)matchesImgtoPat2.size())
     {
         matchesImgtoPat = matchesImgtoPat1;
@@ -391,7 +391,7 @@ std::vector<cv::Mat> randomPatternCornerFinder::computeObjectImagePointsForSingl
         FM_RANSAC, 1, 0.995, innerMask1);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask1);
 
-    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 20*inputImage.cols/1000, innerMask2);
+    findHomography(keypointsImageLocation, keypointsPatternLocation, RANSAC, 10*inputImage.cols/1000, innerMask2);
     getFilteredLocation(keypointsImageLocation, keypointsPatternLocation, innerMask2);
 
     // draw filtered correspondence

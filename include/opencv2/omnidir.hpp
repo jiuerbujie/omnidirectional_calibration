@@ -38,10 +38,12 @@
 // the use of this software, even if advised of the possibility of such damage.
 //
 //M*/
+
+#include <opencv2/core.hpp>
+#include <vector>
+
 #ifndef __OPENCV_OMNIDIR_HPP__
 #define __OPENCV_OMNIDIR_HPP__
-#include "precomp.hpp"
-#include <iostream>
 
 /** @defgroup omnidir Omnidirectional camera calibration
 */

@@ -58,8 +58,8 @@
  */
 
 #include "precomp.hpp"
-#include "multiCameraCalibration.hpp"
-#include<string>
+#include "opencv2/multiCameraCalibration.hpp"
+#include <string>
 #include <vector>
 #include <queue>
 #include <iostream>
@@ -133,7 +133,7 @@ void multiCameraCalibration::loadImages()
     Ptr<DescriptorExtractor> descriptor = _descriptor;
     Ptr<DescriptorMatcher> matcher = _matcher;
 
-    randomPatternCornerFinder finder(_patternWidth, _patternHeight, _nMiniMatches, CV_32F, this->_showExtraction, detector, descriptor, matcher);
+    randomPatternCornerFinder finder(_patternWidth, _patternHeight, 10, CV_32F, this->_showExtraction, detector, descriptor, matcher);
     Mat pattern = cv::imread(file_list[0]);
     finder.loadPattern(pattern);
 
@@ -181,7 +181,7 @@ void multiCameraCalibration::loadImages()
 
         // calibrate
         Mat idx;
-        double rms;
+        double rms = 0.0;
         if (_camType == PINHOLE)
         {
             rms = cv::calibrateCamera(_objectPointsForEachCamera[camera], _imagePointsForEachCamera[camera],
@@ -337,7 +337,7 @@ double multiCameraCalibration::optimizeExtrinsics()
         tvec.reshape(1, 1).copyTo(extrinParam.colRange(offset+3, offset +6));
         offset += 6;
     }
-    double error_pre = computeProjectError(extrinParam);
+    //double error_pre = computeProjectError(extrinParam);
     // optimization
     const double alpha_smooth = 0.01;
     //const double thresh_cond = 1e6;
@@ -360,7 +360,7 @@ double multiCameraCalibration::optimizeExtrinsics()
         extrinParam = extrinParam + G.reshape(1, 1);
 
         change = norm(G) / norm(extrinParam);
-        double error = computeProjectError(extrinParam);
+        //double error = computeProjectError(extrinParam);
     }
 
     double error = computeProjectError(extrinParam);
