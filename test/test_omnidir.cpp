@@ -40,7 +40,7 @@
 //M*/
 
 #include "test_precomp.hpp"
-#include "../src/omnidir.hpp"
+#include "opencv2/ccalib/omnidir.hpp"
 
 class omnidirTest:public ::testing::Test{
 protected:
@@ -53,7 +53,7 @@ protected:
     std::string datasets_repository_path;
 
     virtual void SetUp() {
-        datasets_repository_path = combine(cvtest::TS::ptr()->get_data_path(), "cv/cameracalibration/omnidirectional");
+        datasets_repository_path = combine(cvtest::TS::ptr()->get_data_path(), "cv/cameracalibration/omnidir");
     }
 protected:
     std::string combine(const std::string& _item1, const std::string& _item2);
@@ -202,30 +202,30 @@ TEST_F(omnidirTest, jacobian)
     EXPECT_LT(cv::norm(x2 - xpred), 1e-10);
 }
 
-TEST_F(omnidirTest, calibration)
-{
-    // load pattern points and image points, you should assign your path of the corner file.
-    cv::FileStorage fs("omni_calib_data.xml", cv::FileStorage::READ);
-    std::vector<cv::Mat> v_objectPoints, v_imagePoints;
-    cv::Size imgSize;
-    fs["objectPoints"] >> v_objectPoints;
-    fs["imagePoints"] >> v_imagePoints;
-    fs["imageSize"] >> imgSize;
-
-    cv::Mat K, D;
-    std::vector<cv::Vec3d> omAll,tAll;
-    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 1e-8);
-    cv::Mat xi ;
-    int flag = 0;
-
-    double rms = cv::omnidir::calibrate(v_objectPoints, v_imagePoints, imgSize, K, xi, D, omAll, tAll, flag, critia);
-
-    EXPECT_LT(rms, 2);
-}
+//TEST_F(omnidirTest, calibration)
+//{
+//    // load pattern points and image points, you should assign your path of the corner file.
+//    cv::FileStorage fs("omni_calib_data.xml", cv::FileStorage::READ);
+//    std::vector<cv::Mat> v_objectPoints, v_imagePoints;
+//    cv::Size imgSize;
+//    fs["objectPoints"] >> v_objectPoints;
+//    fs["imagePoints"] >> v_imagePoints;
+//    fs["imageSize"] >> imgSize;
+//
+//    cv::Mat K, D;
+//    std::vector<cv::Vec3d> omAll,tAll;
+//    cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 1e-8);
+//    cv::Mat xi ;
+//    int flag = 0;
+//
+//    double rms = cv::omnidir::calibrate(v_objectPoints, v_imagePoints, imgSize, K, xi, D, omAll, tAll, flag, critia);
+//
+//    EXPECT_LT(rms, 2);
+//}
 
 TEST_F(omnidirTest, calibrateStereo)
 {
-	cv::FileStorage fs1("omni_stereocalib_data_fisheye.xml", cv::FileStorage::READ);
+	cv::FileStorage fs1("omni_stereocalib_data_fisheye2.xml", cv::FileStorage::READ);
 	std::vector<cv::Mat> v_object, v_image1, v_image2;
 	cv::Size imageSize;
 	fs1["imagePoints1"] >> v_image1;
@@ -240,82 +240,82 @@ TEST_F(omnidirTest, calibrateStereo)
 	int flags = cv::omnidir::CALIB_FIX_SKEW;
 	double rms = cv::omnidir::stereoCalibrate(v_object, v_image1, v_image2, imageSize, imageSize, K1, xi1, D1, K2, xi2, D2, om, T, omL, tL, flags, critia);
 
-	cv::FileStorage fsw("omnidir_stereo_result.xml", cv::FileStorage::WRITE);
+	cv::FileStorage fsw("omnidir_stereo_result2.xml", cv::FileStorage::WRITE);
 	fsw << "K1" << K1 << "D1" << D1 << "xi1" << xi1 << "K2" << K2 << "D2" << D2 << "xi2"
 		<< xi2 << "om" << om << "T" << T;
 	fsw.release();
 	EXPECT_LT(rms, 2);
 }
 
-TEST_F(omnidirTest, stereoRectification)
-{
-	cv::FileStorage fs("omnidir_stereo_result.xml", cv::FileStorage::READ);
-	cv::Mat K1, K2, D1, D2;
-	cv::Mat xi1, xi2,R;
-	cv::Vec3d om, T;
-	fs["K1"] >> K1;
-	fs["D1"] >> D1;
-	fs["xi1"] >> xi1;
-	fs["K2"] >> K2;
-	fs["D2"] >> D2;
-	fs["xi2"] >> xi2;
-	fs["om"] >> om;
-	fs["T"] >> T;
-	cv::Rodrigues(om, R);
-	cv::Mat R1, R2;
-	double _xi1, _xi2;
-	_xi1 = xi1.at<double>(0);
-	_xi2 = xi2.at<double>(0);
-	cv::omnidir::stereoRectify(R, T, R1, R2);
-
-	cv::Matx33d KNew(1280.0/3.14, 0, 0, 0, 800/3.14, 0, 0,0,1);
-
-	cv::Size newSize(1280,800);
-
-	cv::Mat imgDis1 = cv::imread("stereo_pair_000_l.jpg",cv::IMREAD_GRAYSCALE);
-	cv::Mat imgDis2 = cv::imread("stereo_pair_000_r.jpg",cv::IMREAD_GRAYSCALE);
-	cv::Mat unDis1, unDis2;
-	cv::omnidir::undistortImage(imgDis1, unDis1, K1, D1, _xi1, cv::omnidir::RECTIFY_LONGLATI, KNew, newSize, R1);
-	cv::omnidir::undistortImage(imgDis2, unDis2, K2, D2, _xi2, cv::omnidir::RECTIFY_LONGLATI, KNew, newSize, R2);
-	cv::imwrite("stereo_pair_000_l_rec.jpg",unDis1);
-	cv::imwrite("stereo_pair_000_r_rec.jpg", unDis2);
-}
-
-TEST_F(omnidirTest, stereoRecons)
-{
-    cv::FileStorage fs("omnidir_stereo_result.xml", cv::FileStorage::READ);
-    cv::Mat K1, K2, D1, D2;
-    cv::Mat xi1, xi2;
-    cv::Vec3d om, T;
-    fs["K1"] >> K1;
-    fs["D1"] >> D1;
-    fs["xi1"] >> xi1;
-    fs["K2"] >> K2;
-    fs["D2"] >> D2;
-    fs["xi2"] >> xi2;
-    fs["om"] >> om;
-    fs["T"] >> T;
-    double _xi1, _xi2;
-    _xi1 = xi1.at<double>(0);
-    _xi2 = xi2.at<double>(0);
-    cv::Mat img1, img2, R;
-    Rodrigues(om, R);
-    img1 = cv::imread("stereo_pair_028_l.jpg", cv::IMREAD_GRAYSCALE);
-    img2 = cv::imread("stereo_pair_028_r.jpg", cv::IMREAD_GRAYSCALE);
-    cv::Size imgSize = img1.size();
-    int numDisparities = 16*7;
-    int SADWindowSize = 3;
-    cv::Mat disparity;
-    int flag = cv::omnidir::RECTIFY_LONGLATI;
-	cv::Mat imageRec1, imageRec2;
-    // the range of theta is (0, pi) and the range of phi is (0, pi)
-    cv::Matx33d KNew(imgSize.width / 2.5, 0, -150, 0, imgSize.height / 2.5, -100, 0, 0, 1);
-
-    cv::omnidir::stereoReconstruct(img1, img2, K1, D1, _xi1, K2, D2, _xi2, R, T, flag,
-        numDisparities, SADWindowSize, disparity, imageRec1, imageRec2, imgSize, KNew, cv::noArray());
-
-    cv::imwrite("disparityMap.png", disparity);
-}
+//TEST_F(omnidirTest, stereoRectification)
+//{
+//	cv::FileStorage fs("omnidir_stereo_result.xml", cv::FileStorage::READ);
+//	cv::Mat K1, K2, D1, D2;
+//	cv::Mat xi1, xi2,R;
+//	cv::Vec3d om, T;
+//	fs["K1"] >> K1;
+//	fs["D1"] >> D1;
+//	fs["xi1"] >> xi1;
+//	fs["K2"] >> K2;
+//	fs["D2"] >> D2;
+//	fs["xi2"] >> xi2;
+//	fs["om"] >> om;
+//	fs["T"] >> T;
+//	cv::Rodrigues(om, R);
+//	cv::Mat R1, R2;
+//	double _xi1, _xi2;
+//	_xi1 = xi1.at<double>(0);
+//	_xi2 = xi2.at<double>(0);
+//	cv::omnidir::stereoRectify(R, T, R1, R2);
+//
+//	cv::Matx33d KNew(1280.0/3.14, 0, 0, 0, 800/3.14, 0, 0,0,1);
+//
+//	cv::Size newSize(1280,800);
+//
+//	cv::Mat imgDis1 = cv::imread("stereo_pair_000_l.jpg",cv::IMREAD_GRAYSCALE);
+//	cv::Mat imgDis2 = cv::imread("stereo_pair_000_r.jpg",cv::IMREAD_GRAYSCALE);
+//	cv::Mat unDis1, unDis2;
+//	cv::omnidir::undistortImage(imgDis1, unDis1, K1, D1, _xi1, cv::omnidir::RECTIFY_LONGLATI, KNew, newSize, R1);
+//	cv::omnidir::undistortImage(imgDis2, unDis2, K2, D2, _xi2, cv::omnidir::RECTIFY_LONGLATI, KNew, newSize, R2);
+//	cv::imwrite("stereo_pair_000_l_rec.jpg",unDis1);
+//	cv::imwrite("stereo_pair_000_r_rec.jpg", unDis2);
+//}
+//
+//TEST_F(omnidirTest, stereoRecons)
+//{
+//    cv::FileStorage fs("omnidir_stereo_result.xml", cv::FileStorage::READ);
+//    cv::Mat K1, K2, D1, D2;
+//    cv::Mat xi1, xi2;
+//    cv::Vec3d om, T;
+//    fs["K1"] >> K1;
+//    fs["D1"] >> D1;
+//    fs["xi1"] >> xi1;
+//    fs["K2"] >> K2;
+//    fs["D2"] >> D2;
+//    fs["xi2"] >> xi2;
+//    fs["om"] >> om;
+//    fs["T"] >> T;
+//    double _xi1, _xi2;
+//    _xi1 = xi1.at<double>(0);
+//    _xi2 = xi2.at<double>(0);
+//    cv::Mat img1, img2, R;
+//    Rodrigues(om, R);
+//    img1 = cv::imread("stereo_pair_028_l.jpg", cv::IMREAD_GRAYSCALE);
+//    img2 = cv::imread("stereo_pair_028_r.jpg", cv::IMREAD_GRAYSCALE);
+//    cv::Size imgSize = img1.size();
+//    int numDisparities = 16*7;
+//    int SADWindowSize = 3;
+//    cv::Mat disparity;
+//    int flag = cv::omnidir::RECTIFY_LONGLATI;
+//	cv::Mat imageRec1, imageRec2;
+//    // the range of theta is (0, pi) and the range of phi is (0, pi)
+//    cv::Matx33d KNew(imgSize.width / 2.5, 0, -150, 0, imgSize.height / 2.5, -100, 0, 0, 1);
+//
+//    cv::omnidir::stereoReconstruct(img1, img2, K1, D1, _xi1, K2, D2, _xi2, R, T, flag,
+//        numDisparities, SADWindowSize, disparity, imageRec1, imageRec2, imgSize, KNew, cv::noArray());
+//
+//    cv::imwrite("disparityMap.png", disparity);
+//}
 
 const cv::Size omnidirTest::imageSize(1280, 800);
 
