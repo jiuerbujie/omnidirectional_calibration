@@ -171,7 +171,7 @@ int main(int argc, char** argv)
 {
     Size boardSize, imageSize;
     int flags = 0;
-    double square_width = 0.0, square_height = 0.0;
+    double square_width = 1.0, square_height = 1.0;
     const char* outputFilename = "out_camera_params.xml";
     const char* inputFilename = 0;
     vector<Mat> objectPoints;
