@@ -10,7 +10,7 @@ Requires
 
 - OpenCV 3.0
 
-This package is selected as a project in GSoC 2015 of OpenCV, mentored by [Bo Li](https://github.com/prclibo). This repository is a standalone project during my development, you may notice that the directory structure is the same as OpenCV. So far, it is not integrated into OpenCV, but you can still use it if you have OpenCV 3.0 and add source files and include files to your project.
+This package is selected as a project in GSoC 2015 of OpenCV, mentored by [Bo Li](https://github.com/prclibo). This repository is a standalone project during my development, you may notice that the directory structure is the same as OpenCV. Now, it is merged into  OpenCV's [opencv_contrib repository](https://github.com/opencv/opencv_contrib). You can use it by compiling OpenCV with opencv_contrib or adding source files and include files in this repository to your project.
 
 Usage
 -----------------
